@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { AnalyzeResult, ExtractedRestaurant, SavedRestaurant } from '@/lib/types';
 import { toAnalyzePayload, toThumb } from '@/lib/image';
+import { getPreferredProvider } from '@/lib/provider-pref';
 
 type Phase = 'analyzing' | 'review' | 'error';
 
@@ -38,7 +39,7 @@ export default function AnalyzeSheet({
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, mediaType }),
+          body: JSON.stringify({ image: base64, mediaType, provider: getPreferredProvider() ?? undefined }),
         });
         const data = await res.json();
         if (cancelled) return;

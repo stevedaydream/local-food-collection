@@ -16,15 +16,29 @@
   - iOS：加入主畫面後從相簿分享或 App 內上傳（iOS 尚不支援 PWA share target，見 Roadmap）
 - 💾 **資料在你手上**：收藏存在裝置 localStorage，支援 JSON 匯出備份 / 匯入
 
+## AI 引擎（四種可選）
+
+分析引擎可透過環境變數設定，**至少設定一組**；設定多組時可在 App 內 ⚙️ 切換：
+
+| Provider | 必要環境變數 | 選用 | 預設模型 |
+|---|---|---|---|
+| Claude (Anthropic) | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | `claude-opus-4-8` |
+| GPT (OpenAI) | `OPENAI_API_KEY` | `OPENAI_MODEL`、`OPENAI_BASE_URL` | `gpt-4o` |
+| Gemini (Google) | `GEMINI_API_KEY` | `GEMINI_MODEL` | `gemini-2.5-flash` |
+| 自訂 Endpoint | `CUSTOM_BASE_URL` | `CUSTOM_MODEL`、`CUSTOM_API_KEY` | `gemma-3-27b-it` |
+
+- `AI_PROVIDER` 指定伺服器預設（`anthropic` / `gpt` / `gemini` / `custom`），未設定則取第一個有金鑰的
+- **自訂 Endpoint** 走 OpenAI 相容 API（`{CUSTOM_BASE_URL}/chat/completions`），之後要接手機/本機部署的 Gemma（llama.cpp、Ollama、vLLM 等）只要填 URL 和模型名即可；考量本機模型多半不支援 structured output，這條路徑改用 prompt 要求 JSON + 容錯解析
+
 ## 快速開始
 
 ```bash
-cp .env.example .env        # 填入你的 ANTHROPIC_API_KEY
+cp .env.example .env        # 至少填一組 AI provider 金鑰
 npm install
 npm run dev                 # http://localhost:3000
 ```
 
-部署到 Vercel：import 這個 repo，在專案設定加上環境變數 `ANTHROPIC_API_KEY` 即可。
+部署到 Vercel：import 這個 repo，在專案設定加上對應環境變數即可。
 
 > PWA 安裝與 Web Share Target 需要 HTTPS（Vercel 預設就有）。
 
@@ -42,7 +56,9 @@ npm run dev                 # http://localhost:3000
 
 | 路徑 | 說明 |
 |---|---|
-| `app/api/analyze/route.ts` | Claude Vision 截圖分析，以 JSON Schema 結構化輸出保證格式 |
+| `app/api/analyze/route.ts` | 截圖分析入口，依 provider 分派 |
+| `lib/ai-providers.ts` | 四種 AI provider 實作（Anthropic structured output / OpenAI json_schema / Gemini JSON mode / 自訂 OpenAI 相容） |
+| `app/api/providers/route.ts` | 回傳已設定的 provider 清單給設定畫面 |
 | `app/api/geocode/route.ts` | 地址 → 座標（OpenStreetMap Nominatim 代理，含快取） |
 | `lib/store.ts` | localStorage 收藏 CRUD、匯出/匯入、Google Maps 連結產生 |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |

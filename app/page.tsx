@@ -7,6 +7,7 @@ import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
 import MapView from '@/components/MapView';
+import SettingsSheet from '@/components/SettingsSheet';
 
 export default function Home() {
   const [restaurants, setRestaurants] = useState<SavedRestaurant[]>([]);
@@ -14,6 +15,7 @@ export default function Home() {
   const [tab, setTab] = useState<'list' | 'map'>('list');
   const [analyzeFile, setAnalyzeFile] = useState<Blob | null>(null);
   const [showRandom, setShowRandom] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
@@ -75,7 +77,12 @@ export default function Home() {
         <h1>
           🍜 口袋<span>美食地圖</span>
         </h1>
-        <span className="meta">{restaurants.length} 家收藏</span>
+        <span className="meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {restaurants.length} 家收藏
+          <button className="icon-btn" onClick={() => setShowSettings(true)} aria-label="設定">
+            ⚙️
+          </button>
+        </span>
       </header>
 
       <nav className="tabs">
@@ -147,6 +154,7 @@ export default function Home() {
         <AnalyzeSheet file={analyzeFile} onSave={handleSaved} onClose={() => setAnalyzeFile(null)} />
       )}
       {showRandom && <RandomSheet restaurants={restaurants} onClose={() => setShowRandom(false)} />}
+      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </main>
   );
 }
