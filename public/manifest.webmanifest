@@ -1,0 +1,36 @@
+{
+  "name": "口袋美食地圖",
+  "short_name": "美食地圖",
+  "description": "截圖分享進來，AI 自動歸檔你的口袋名單；不知道吃什麼時，一鍵隨機推薦。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1a1614",
+  "theme_color": "#1a1614",
+  "lang": "zh-Hant",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "🎲 吃什麼？",
+      "short_name": "吃什麼",
+      "description": "隨機推薦一家口袋名單裡的餐廳",
+      "url": "/?random=1",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "image", "accept": ["image/png", "image/jpeg", "image/webp", "image/gif"] }]
+    }
+  }
+}
