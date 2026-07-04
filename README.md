@@ -66,10 +66,31 @@ npm run dev                 # http://localhost:3000
 | `components/MapView.tsx` | Leaflet + OSM 地圖 |
 | `public/sw.js` | Service worker：PWA 安裝 + 接收分享的截圖 |
 | `public/manifest.webmanifest` | PWA 設定：主畫面捷徑、share_target |
+| `capacitor.config.ts` | Capacitor 設定：Android 殼載入線上網址（`server.url`） |
+| `lib/widget-sync.ts` | 在 Capacitor 殼內把口袋名單同步給原生 widget（瀏覽器環境 no-op） |
+| `android/` | Android 原生殼 + 兩個主畫面 widget（見下方） |
+
+## Android 原生殼 + Widget
+
+Capacitor 殼，WebView 直接載入 `https://local-food-collection.vercel.app`（網頁更新不用重發 App）。
+
+- **🎲 吃什麼（1×1 按鈕）**：`DiceWidgetProvider`，點了開 App 並直接彈出隨機推薦（`?random=1`）
+- **隨機餐廳卡片（4×2）**：`RandomFoodWidgetProvider`，直接顯示一家口袋餐廳，可「換一家」、開 Google Maps 導航、點卡片開 App
+
+資料流：`lib/store.ts` 每次寫入（+ App 開啟時）→ `lib/widget-sync.ts` 呼叫原生 `WidgetSyncPlugin` → SharedPreferences → widget 重繪。widget 資料來源是**殼內 WebView 的 localStorage**，與 Chrome/PWA 的收藏是分開的。
+
+```bash
+npx cap sync android                          # 改過 capacitor.config.ts 後同步
+cd android && ./gradlew assembleDebug        # 或用 Android Studio 開 android/ 資料夾
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+> Gradle 建置需 JDK 17–21（系統 Java 25 太新，可用 Android Studio 內建 JBR：設 `JAVA_HOME` 指向 `Android Studio/jbr`）。
 
 ## Roadmap
 
-- [ ] **真正的主畫面 widget**：需要原生外殼（iOS WidgetKit / Android Glance）。過渡方案：iOS 可用「捷徑」App 建一個開啟 `https://你的網址/?random=1` 的捷徑放主畫面
+- [x] **真正的主畫面 widget（Android）**：Capacitor 殼 + RemoteViews widget（見上）
+- [ ] **iOS widget**：需 WidgetKit；過渡方案：iOS 可用「捷徑」App 建一個開啟 `https://你的網址/?random=1` 的捷徑放主畫面
 - [ ] **iOS 分享截圖進 App**：用「捷徑」建立分享表單捷徑，把圖片 POST 到 `/api/analyze`
 - [ ] **跨裝置同步**：接 Supabase（Auth + Postgres + Storage），取代 localStorage
 - [ ] 依目前位置排序／「附近的口袋名單」推薦

@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">口袋美食地圖</string>
+    <string name="title_activity_main">口袋美食地圖</string>
+    <string name="package_name">com.stevedaydream.localfood</string>
+    <string name="custom_url_scheme">com.stevedaydream.localfood</string>
+
+    <!-- Widgets -->
+    <string name="widget_dice_label">吃什麼</string>
+    <string name="widget_dice_description">一鍵開啟隨機推薦：不知道吃什麼就按它</string>
+    <string name="widget_food_title">🎲 今天吃這家？</string>
+    <string name="widget_food_empty">口袋名單還是空的\n打開 App 收藏幾家吧 🍜</string>
+    <string name="widget_food_description">顯示一家隨機口袋餐廳，可換一家或直接導航</string>
+    <string name="widget_food_shuffle">🎲 換一家</string>
+    <string name="widget_food_maps">🧭 導航</string>
+</resources>

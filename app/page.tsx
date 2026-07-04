@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant } from '@/lib/store';
+import { syncToWidget } from '@/lib/widget-sync';
 import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
@@ -20,8 +21,11 @@ export default function Home() {
   const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setRestaurants(loadRestaurants());
+    const loaded = loadRestaurants();
+    setRestaurants(loaded);
     setReady(true);
+    // Capacitor 殼內：開 App 時把名單種子同步給原生 widget
+    syncToWidget(loaded);
 
     const params = new URLSearchParams(window.location.search);
     // 主畫面捷徑「🎲 吃什麼」直接彈出隨機推薦
