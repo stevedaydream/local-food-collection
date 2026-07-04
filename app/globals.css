@@ -111,15 +111,58 @@ a {
   padding: 4px 16px;
 }
 
-/* 卡片 */
+/* 卡片（外層負責左滑手勢與露出動作區） */
+.card-wrap {
+  position: relative;
+  margin-bottom: 12px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  touch-action: pan-y; /* 垂直捲動給瀏覽器，水平滑動自己接管 */
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px;
-  margin-bottom: 12px;
   display: flex;
   gap: 12px;
+  position: relative;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  overflow: hidden;
+}
+
+.swipe-btn {
+  width: 66px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.swipe-btn span {
+  font-size: 12px;
+}
+
+.swipe-btn.edit {
+  background: var(--accent-strong);
+}
+
+.swipe-btn.delete {
+  background: var(--danger);
 }
 
 .card .thumb {
@@ -220,6 +263,14 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 底部三顆按鈕時縮一點以免擠爆 */
+.bottom-bar .btn {
+  padding: 12px 14px;
+  font-size: 14px;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 .btn.primary {

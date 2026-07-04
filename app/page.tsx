@@ -2,21 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
-import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant } from '@/lib/store';
+import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, updateRestaurant } from '@/lib/store';
 import { syncToWidget } from '@/lib/widget-sync';
 import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
-import MapView from '@/components/MapView';
+import EditSheet from '@/components/EditSheet';
 import SettingsSheet from '@/components/SettingsSheet';
+// 地圖暫時下架；MapView 保留為未來 Google Maps API 的接口（components/MapView.tsx）
 
 export default function Home() {
   const [restaurants, setRestaurants] = useState<SavedRestaurant[]>([]);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<'list' | 'map'>('list');
   const [analyzeFile, setAnalyzeFile] = useState<Blob | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  /** EditSheet 狀態：null=關閉、'new'=手動新增、物件=編輯該筆 */
+  const [editTarget, setEditTarget] = useState<SavedRestaurant | 'new' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
@@ -58,6 +60,11 @@ export default function Home() {
     if (confirm('確定要刪除這家餐廳？')) setRestaurants(removeRestaurant(id));
   };
 
+  const handleEditSave = (item: SavedRestaurant) => {
+    setRestaurants(editTarget === 'new' ? addRestaurants([item]) : updateRestaurant(item));
+    setEditTarget(null);
+  };
+
   const handleExport = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' });
     const a = document.createElement('a');
@@ -89,29 +96,20 @@ export default function Home() {
         </span>
       </header>
 
-      <nav className="tabs">
-        <button className={`tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
-          📋 名單
-        </button>
-        <button className={`tab ${tab === 'map' ? 'active' : ''}`} onClick={() => setTab('map')}>
-          🗺️ 地圖
-        </button>
-      </nav>
-
       <section className="content">
         {!ready ? null : restaurants.length === 0 ? (
           <div className="empty">
             <span className="emoji">📸</span>
             在 IG、Threads、小紅書看到好吃的？
             <br />
-            截圖後按下方「新增截圖」，AI 幫你自動歸檔。
+            截圖後按下方「截圖新增」，AI 幫你自動歸檔。
             <br />
             安裝到主畫面後，也可以直接把截圖「分享」進來。
           </div>
-        ) : tab === 'list' ? (
-          restaurants.map((r) => <RestaurantCard key={r.id} r={r} onDelete={handleDelete} />)
         ) : (
-          <MapView restaurants={restaurants} />
+          restaurants.map((r) => (
+            <RestaurantCard key={r.id} r={r} onEdit={setEditTarget} onDelete={handleDelete} />
+          ))
         )}
 
         {ready && restaurants.length > 0 && (
@@ -124,7 +122,10 @@ export default function Home() {
 
       <div className="bottom-bar">
         <button className="btn secondary" onClick={() => fileInput.current?.click()}>
-          📸 新增截圖
+          📸 截圖新增
+        </button>
+        <button className="btn secondary" onClick={() => setEditTarget('new')}>
+          ✏️ 手動
         </button>
         <button className="btn primary" onClick={() => setShowRandom(true)}>
           🎲 吃什麼？
@@ -158,6 +159,13 @@ export default function Home() {
         <AnalyzeSheet file={analyzeFile} onSave={handleSaved} onClose={() => setAnalyzeFile(null)} />
       )}
       {showRandom && <RandomSheet restaurants={restaurants} onClose={() => setShowRandom(false)} />}
+      {editTarget && (
+        <EditSheet
+          initial={editTarget === 'new' ? null : editTarget}
+          onSave={handleEditSave}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </main>
   );

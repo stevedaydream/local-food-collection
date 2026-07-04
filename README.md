@@ -7,8 +7,9 @@
 
 - 📸 **截圖 AI 分析**：上傳（或從分享選單傳入）社群貼文截圖，Claude Vision 自動抽出店名、地址、料理類型、推薦菜色、來源平台與備註，一張截圖可辨識多家餐廳（清單型貼文也 OK）
 - ✅ **儲存前確認**：AI 結果可先編輯、勾選要收藏哪幾家；信心較低的欄位會標示「建議核對」
-- 📋 **口袋名單**：卡片列表 + 料理類型標籤，附截圖縮圖
-- 🗺️ **美食地圖**：有地址的餐廳自動地理編碼（Nominatim），標在 Leaflet 地圖上
+- 📋 **口袋名單**：卡片列表 + 料理類型標籤，附截圖縮圖；卡片**左滑可編輯或刪除**
+- ✏️ **手動新增**：沒有截圖也能直接輸入店名、地址等資訊收藏
+- 🗺️ 地圖檢視暫時下架（`components/MapView.tsx` 保留為接口，未來改接 Google Maps API；地理編碼 `/api/geocode` 照常運作）
 - 🎲 **吃什麼？**：一鍵隨機推薦，顯示店名 + 地址 + Google Maps 導航連結，可按料理類型篩選、不滿意就「換一家」
 - 📲 **PWA（類 widget 體驗）**：
   - 安裝到手機主畫面，**長按圖示 → 「🎲 吃什麼」捷徑**直接彈出隨機推薦
@@ -51,7 +52,7 @@ npm run dev                 # http://localhost:3000
                                      ▼
                              確認/編輯畫面 ──► GET /api/geocode（Nominatim 地址轉座標）
                                      ▼
-                             localStorage 收藏 ──► 名單 / 地圖 / 隨機推薦
+                             localStorage 收藏 ──► 名單 / 隨機推薦（地圖暫下架）
 ```
 
 | 路徑 | 說明 |
@@ -63,7 +64,8 @@ npm run dev                 # http://localhost:3000
 | `lib/store.ts` | localStorage 收藏 CRUD、匯出/匯入、Google Maps 連結產生 |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |
 | `components/RandomSheet.tsx` | 隨機推薦（可依料理類型篩選） |
-| `components/MapView.tsx` | Leaflet + OSM 地圖 |
+| `components/EditSheet.tsx` | 手動新增 / 編輯收藏（共用表單，地址變更會重新地理編碼） |
+| `components/MapView.tsx` | 地圖接口（暫未掛載，未來改 Google Maps API 時替換內部實作） |
 | `public/sw.js` | Service worker：PWA 安裝 + 接收分享的截圖 |
 | `public/manifest.webmanifest` | PWA 設定：主畫面捷徑、share_target |
 | `capacitor.config.ts` | Capacitor 設定：Android 殼載入線上網址（`server.url`） |

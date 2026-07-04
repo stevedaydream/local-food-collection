@@ -1,5 +1,9 @@
 'use client';
 
+// ⚠️ 地圖功能暫時下架，本元件保留為地圖接口：
+// 未來改用 Google Maps API 時，維持 props { restaurants } 不變、替換內部實作即可，
+// 再從 app/page.tsx 重新掛回（搭配 /api/geocode 取得座標）。
+
 import { useEffect, useRef } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { mapsUrl } from '@/lib/store';

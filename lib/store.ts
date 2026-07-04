@@ -30,6 +30,12 @@ export function addRestaurants(items: SavedRestaurant[]): SavedRestaurant[] {
   return list;
 }
 
+export function updateRestaurant(item: SavedRestaurant): SavedRestaurant[] {
+  const list = loadRestaurants().map((r) => (r.id === item.id ? item : r));
+  saveRestaurants(list);
+  return list;
+}
+
 export function removeRestaurant(id: string): SavedRestaurant[] {
   const list = loadRestaurants().filter((r) => r.id !== id);
   saveRestaurants(list);
