@@ -33,3 +33,13 @@ export interface AnalyzeResult {
   is_food_content: boolean;
   restaurants: ExtractedRestaurant[];
 }
+
+/** 附近搜尋回傳的餐廳候選（未儲存，隨機推薦用） */
+export interface NearbyPlace {
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  rating: number | null;
+  cuisine: string | null;
+}

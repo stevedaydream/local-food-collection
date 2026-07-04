@@ -52,6 +52,8 @@ export default function RestaurantCard({
     setDragging(false);
     if (axis.current === 'h') setOffset((o) => (o < -ACTIONS_WIDTH / 2 ? -ACTIONS_WIDTH : 0));
     axis.current = null;
+    // 只擋放開瞬間伴隨的合成 click，之後（點編輯/刪除）恢復正常
+    if (swiped.current) setTimeout(() => (swiped.current = false), 80);
   };
 
   return (
@@ -66,7 +68,6 @@ export default function RestaurantCard({
         if (swiped.current) {
           e.preventDefault();
           e.stopPropagation();
-          swiped.current = false;
         }
       }}
     >

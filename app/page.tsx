@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, updateRestaurant } from '@/lib/store';
 import { syncToWidget } from '@/lib/widget-sync';
@@ -19,6 +19,24 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   /** EditSheet 狀態：null=關閉、'new'=手動新增、物件=編輯該筆 */
   const [editTarget, setEditTarget] = useState<SavedRestaurant | 'new' | null>(null);
+  // 條件篩選（空字串 = 不篩）
+  const [fSource, setFSource] = useState('');
+  const [fCity, setFCity] = useState('');
+  const [fCuisine, setFCuisine] = useState('');
+
+  const uniq = (xs: (string | null)[]) =>
+    Array.from(new Set(xs.filter((x): x is string => !!x))).sort();
+  const sources = useMemo(() => uniq(restaurants.map((r) => r.sourcePlatform)), [restaurants]);
+  const cities = useMemo(() => uniq(restaurants.map((r) => r.city)), [restaurants]);
+  const cuisines = useMemo(() => uniq(restaurants.map((r) => r.cuisine)), [restaurants]);
+
+  const filtered = restaurants.filter(
+    (r) =>
+      (!fSource || r.sourcePlatform === fSource) &&
+      (!fCity || r.city === fCity) &&
+      (!fCuisine || r.cuisine === fCuisine),
+  );
+  const filterOn = !!(fSource || fCity || fCuisine);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
@@ -97,6 +115,47 @@ export default function Home() {
       </header>
 
       <section className="content">
+        {ready && restaurants.length > 0 && (
+          <div className="filter-bar">
+            <select value={fSource} onChange={(e) => setFSource(e.target.value)} aria-label="來源篩選">
+              <option value="">來源</option>
+              {sources.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <select value={fCity} onChange={(e) => setFCity(e.target.value)} aria-label="地區篩選">
+              <option value="">地區</option>
+              {cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <select value={fCuisine} onChange={(e) => setFCuisine(e.target.value)} aria-label="類型篩選">
+              <option value="">類型</option>
+              {cuisines.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            {filterOn && (
+              <button
+                className="icon-btn"
+                onClick={() => {
+                  setFSource('');
+                  setFCity('');
+                  setFCuisine('');
+                }}
+              >
+                ✕ 清除
+              </button>
+            )}
+          </div>
+        )}
+
         {!ready ? null : restaurants.length === 0 ? (
           <div className="empty">
             <span className="emoji">📸</span>
@@ -106,8 +165,13 @@ export default function Home() {
             <br />
             安裝到主畫面後，也可以直接把截圖「分享」進來。
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <span className="emoji">🔍</span>
+            沒有符合篩選條件的收藏，換個條件試試。
+          </div>
         ) : (
-          restaurants.map((r) => (
+          filtered.map((r) => (
             <RestaurantCard key={r.id} r={r} onEdit={setEditTarget} onDelete={handleDelete} />
           ))
         )}

@@ -6,6 +6,23 @@
     android:background="@drawable/widget_bg"
     android:padding="14dp">
 
+    <!-- 骰子滾動動畫（換一家時顯示 2 秒，ViewFlipper 自動輪播骰面） -->
+    <ViewFlipper
+        android:id="@+id/widget_food_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoStart="true"
+        android:flipInterval="140"
+        android:visibility="gone">
+
+        <TextView style="@style/WidgetDiceFace" android:text="⚀" />
+        <TextView style="@style/WidgetDiceFace" android:text="⚂" />
+        <TextView style="@style/WidgetDiceFace" android:text="⚄" />
+        <TextView style="@style/WidgetDiceFace" android:text="⚁" />
+        <TextView style="@style/WidgetDiceFace" android:text="⚅" />
+        <TextView style="@style/WidgetDiceFace" android:text="⚃" />
+    </ViewFlipper>
+
     <!-- 沒有資料時的空狀態 -->
     <TextView
         android:id="@+id/widget_food_empty"

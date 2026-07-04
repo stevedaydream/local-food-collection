@@ -7,6 +7,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -17,6 +19,8 @@ import org.json.JSONObject;
 public class RandomFoodWidgetProvider extends AppWidgetProvider {
 
     private static final String ACTION_SHUFFLE = "com.stevedaydream.localfood.widget.SHUFFLE";
+    /** 骰子在 widget 內滾動的時長 (ms)，與網頁版動畫一致 */
+    private static final long ROLL_MS = 2000;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {
@@ -29,8 +33,29 @@ public class RandomFoodWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         if (ACTION_SHUFFLE.equals(intent.getAction())) {
-            WidgetData.shuffle(context);
-            refreshAll(context);
+            // 先切到骰子滾動畫面，2 秒後才揭曉新結果
+            showRollingAll(context);
+            final PendingResult pending = goAsync();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                WidgetData.shuffle(context);
+                refreshAll(context);
+                pending.finish();
+            }, ROLL_MS);
+        }
+    }
+
+    /** 所有已放置的 widget 切到骰子滾動狀態（ViewFlipper 自動輪播骰面） */
+    private static void showRollingAll(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(
+                new ComponentName(context, RandomFoodWidgetProvider.class));
+        if (ids.length == 0) return;
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_random_food);
+        views.setViewVisibility(R.id.widget_food_content, View.GONE);
+        views.setViewVisibility(R.id.widget_food_empty, View.GONE);
+        views.setViewVisibility(R.id.widget_food_flipper, View.VISIBLE);
+        for (int id : ids) {
+            manager.updateAppWidget(id, views);
         }
     }
 
@@ -48,6 +73,7 @@ public class RandomFoodWidgetProvider extends AppWidgetProvider {
 
     private static RemoteViews buildViews(Context context) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_random_food);
+        views.setViewVisibility(R.id.widget_food_flipper, View.GONE);
         JSONObject r = WidgetData.getCurrent(context);
 
         // 點卡片本體 → 開 App

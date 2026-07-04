@@ -8,9 +8,11 @@
 - 📸 **截圖 AI 分析**：上傳（或從分享選單傳入）社群貼文截圖，Claude Vision 自動抽出店名、地址、料理類型、推薦菜色、來源平台與備註，一張截圖可辨識多家餐廳（清單型貼文也 OK）
 - ✅ **儲存前確認**：AI 結果可先編輯、勾選要收藏哪幾家；信心較低的欄位會標示「建議核對」
 - 📋 **口袋名單**：卡片列表 + 料理類型標籤，附截圖縮圖；卡片**左滑可編輯或刪除**
-- ✏️ **手動新增**：沒有截圖也能直接輸入店名、地址等資訊收藏
+- ✏️ **手動新增**：沒有截圖也能直接輸入店名、地址等資訊收藏；店名旁「🔍 找地址」可搜尋地圖自動帶入正確地址與導航位置（設 `GOOGLE_MAPS_API_KEY` 走 Google Places，未設定退回 Nominatim）
 - 🗺️ 地圖檢視暫時下架（`components/MapView.tsx` 保留為接口，未來改接 Google Maps API；地理編碼 `/api/geocode` 照常運作）
-- 🎲 **吃什麼？**：一鍵隨機推薦，顯示店名 + 地址 + Google Maps 導航連結，可按料理類型篩選、不滿意就「換一家」
+- 🎲 **吃什麼？**：2 秒全屏骰子動畫後隨機推薦，顯示店名 + 地址 + Google Maps 導航連結，並列出沒被骰到的其他候選；可按類型篩選、不滿意就「換一家」
+  - **📍 附近模式**：口袋名單空空（或主動切換）時，用 GPS 定位（失敗退回台北市中心）搜尋附近餐廳來骰——設 `GOOGLE_MAPS_API_KEY` 走 Google Places Nearby（含評分），未設定退回 OSM Overpass
+- 🔎 **條件篩選**：名單可依 來源（IG/FB…）× 地區（縣市）× 類型（早午餐、火鍋…）快速過濾，分類欄位在編輯表單都能補
 - 📲 **PWA（類 widget 體驗）**：
   - 安裝到手機主畫面，**長按圖示 → 「🎲 吃什麼」捷徑**直接彈出隨機推薦
   - Android：在任何 App 截圖後按「分享」→ 選「美食地圖」，直接進入 AI 分析（Web Share Target）
@@ -61,6 +63,11 @@ npm run dev                 # http://localhost:3000
 | `lib/ai-providers.ts` | 四種 AI provider 實作（Anthropic structured output / OpenAI json_schema / Gemini JSON mode / 自訂 OpenAI 相容） |
 | `app/api/providers/route.ts` | 回傳已設定的 provider 清單給設定畫面 |
 | `app/api/geocode/route.ts` | 地址 → 座標（OpenStreetMap Nominatim 代理，含快取） |
+| `app/api/place-search/route.ts` | 店名 → 地址+座標（有 `GOOGLE_MAPS_API_KEY` 走 Google Places，否則 Nominatim） |
+| `app/api/nearby/route.ts` | 座標 → 附近餐廳清單（Google Places Nearby / OSM Overpass） |
+| `components/RandomSheet.tsx` | 隨機推薦：口袋/附近雙來源 + 骰子動畫 + 遺珠清單 |
+| `components/DiceRoll.tsx` | 全屏 2 秒骰子滾動動畫 |
+| `lib/geo.ts` | 取得定位（Capacitor 原生 / 瀏覽器，失敗退回台北） |
 | `lib/store.ts` | localStorage 收藏 CRUD、匯出/匯入、Google Maps 連結產生 |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |
 | `components/RandomSheet.tsx` | 隨機推薦（可依料理類型篩選） |

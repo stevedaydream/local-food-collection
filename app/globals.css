@@ -111,6 +111,38 @@ a {
   padding: 4px 16px;
 }
 
+/* 條件篩選列 */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 0 12px;
+}
+
+.filter-bar select {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 10px;
+  appearance: none;
+}
+
+.filter-bar select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.filter-bar .icon-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 /* 卡片（外層負責左滑手勢與露出動作區） */
 .card-wrap {
   position: relative;
@@ -349,6 +381,81 @@ a {
   font-size: 14px;
 }
 
+/* 全屏骰子滾動 */
+.dice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(14, 11, 9, 0.93);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 20px;
+}
+
+.dice-face {
+  font-size: 116px;
+  line-height: 1;
+  color: var(--accent);
+  animation: dice-tumble 0.45s linear infinite;
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--accent-strong) 45%, transparent));
+}
+
+.dice-hint {
+  color: var(--text-dim);
+  font-size: 15px;
+  letter-spacing: 0.15em;
+}
+
+@keyframes dice-tumble {
+  0% { transform: rotate(0deg) translateY(0) scale(1); }
+  25% { transform: rotate(90deg) translateY(-20px) scale(1.08); }
+  50% { transform: rotate(180deg) translateY(0) scale(1); }
+  75% { transform: rotate(270deg) translateY(-12px) scale(1.05); }
+  100% { transform: rotate(360deg) translateY(0) scale(1); }
+}
+
+/* 沒被骰到的候選清單 */
+.others {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.others-title {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.other-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--border);
+  font-size: 13.5px;
+}
+
+.other-row .other-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.other-row .other-meta {
+  color: var(--text-dim);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.other-row a {
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+
 /* 空狀態 */
 .empty {
   text-align: center;
@@ -393,6 +500,39 @@ a {
   color: var(--danger);
   font-size: 13.5px;
   margin: 8px 0;
+}
+
+/* 店名旁的搜尋地址小按鈕 */
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.field-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mini-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.mini-btn:disabled {
+  opacity: 0.5;
+}
+
+.lookup-msg {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 5px;
+  line-height: 1.5;
 }
 
 .map-container {
