@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { getPreferredProvider, setPreferredProvider } from '@/lib/provider-pref';
+import { getLocalConfig } from '@/lib/local-mode';
+import LocalSetupSheet from './LocalSetupSheet';
 
 interface ProviderInfo {
   id: string;
@@ -12,8 +14,11 @@ export default function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [available, setAvailable] = useState<ProviderInfo[] | null>(null);
   const [serverDefault, setServerDefault] = useState<string | null>(null);
   const [choice, setChoice] = useState<string>(getPreferredProvider() ?? 'auto');
+  const [showLocalSetup, setShowLocalSetup] = useState(false);
+  const [localConfigured, setLocalConfigured] = useState(false);
 
   useEffect(() => {
+    setLocalConfigured(!!getLocalConfig());
     fetch('/api/providers')
       .then((r) => r.json())
       .then((d) => {
@@ -24,9 +29,31 @@ export default function SettingsSheet({ onClose }: { onClose: () => void }) {
   }, []);
 
   const select = (id: string) => {
+    if (id === 'local' && !getLocalConfig()) {
+      // 還沒設置過本機模式 → 先走教學精靈，完成才切換
+      setShowLocalSetup(true);
+      return;
+    }
     setChoice(id);
     setPreferredProvider(id === 'auto' ? null : id);
   };
+
+  const radioRow = (id: string, label: React.ReactNode, extra?: React.ReactNode) => (
+    <label
+      key={id}
+      style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 4px', fontSize: 15 }}
+    >
+      <input
+        type="radio"
+        name="provider"
+        style={{ width: 'auto' }}
+        checked={choice === id}
+        onChange={() => select(id)}
+      />
+      <span style={{ flex: 1 }}>{label}</span>
+      {extra}
+    </label>
+  );
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -36,51 +63,50 @@ export default function SettingsSheet({ onClose }: { onClose: () => void }) {
           <p className="meta">
             載入中 <span className="spinner" />
           </p>
-        ) : available.length === 0 ? (
-          <p className="error-text">
-            伺服器尚未設定任何 AI provider。請在部署環境變數中設定至少一組金鑰
-            （ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / CUSTOM_BASE_URL）。
-          </p>
         ) : (
           <>
-            <label
-              style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 4px', fontSize: 15 }}
-            >
-              <input
-                type="radio"
-                name="provider"
-                style={{ width: 'auto' }}
-                checked={choice === 'auto'}
-                onChange={() => select('auto')}
-              />
-              <span>
-                伺服器預設
-                {serverDefault && (
-                  <span className="meta" style={{ display: 'block', fontSize: 12 }}>
-                    目前為 {available.find((p) => p.id === serverDefault)?.label ?? serverDefault}
-                  </span>
-                )}
-              </span>
-            </label>
-            {available.map((p) => (
-              <label
-                key={p.id}
-                style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 4px', fontSize: 15 }}
+            {available.length === 0 && (
+              <p className="error-text" style={{ fontSize: 13 }}>
+                伺服器尚未設定雲端 AI 金鑰（ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY /
+                CUSTOM_BASE_URL），仍可使用下方「本機模式」。
+              </p>
+            )}
+            {available.length > 0 &&
+              radioRow(
+                'auto',
+                <>
+                  伺服器預設
+                  {serverDefault && (
+                    <span className="meta" style={{ display: 'block', fontSize: 12 }}>
+                      目前為 {available.find((p) => p.id === serverDefault)?.label ?? serverDefault}
+                    </span>
+                  )}
+                </>,
+              )}
+            {available.map((p) => radioRow(p.id, p.label))}
+
+            <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+
+            {radioRow(
+              'local',
+              <>
+                📱 本機模式（瀏覽器直連裝置上的模型）
+                <span className="meta" style={{ display: 'block', fontSize: 12 }}>
+                  {localConfigured
+                    ? `已設置：${getLocalConfig()?.model} @ ${getLocalConfig()?.baseUrl}`
+                    : '截圖不上雲端，適合手機/電腦跑 Gemma 等本機模型'}
+                </span>
+              </>,
+              <button
+                className="icon-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowLocalSetup(true);
+                }}
               >
-                <input
-                  type="radio"
-                  name="provider"
-                  style={{ width: 'auto' }}
-                  checked={choice === p.id}
-                  onChange={() => select(p.id)}
-                />
-                {p.label}
-              </label>
-            ))}
-            <p className="meta" style={{ marginTop: 10, fontSize: 12.5 }}>
-              自訂 Endpoint 走 OpenAI 相容 API（/v1/chat/completions），之後要接手機上的
-              Gemma，只要在伺服器環境變數填 CUSTOM_BASE_URL / CUSTOM_MODEL 即可。
-            </p>
+                {localConfigured ? '編輯' : '設置 →'}
+              </button>,
+            )}
           </>
         )}
         <div className="sheet-actions">
@@ -88,6 +114,19 @@ export default function SettingsSheet({ onClose }: { onClose: () => void }) {
             完成
           </button>
         </div>
+
+        {showLocalSetup && (
+          <LocalSetupSheet
+            onDone={(configured) => {
+              setShowLocalSetup(false);
+              setLocalConfigured(configured);
+              if (configured) {
+                setChoice('local');
+                setPreferredProvider('local');
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );

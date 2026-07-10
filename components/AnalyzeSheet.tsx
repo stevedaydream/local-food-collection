@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { AnalyzeResult, ExtractedRestaurant, SavedRestaurant } from '@/lib/types';
 import { toAnalyzePayload, toThumb } from '@/lib/image';
 import { getPreferredProvider } from '@/lib/provider-pref';
+import { analyzeLocal, getLocalConfig } from '@/lib/local-mode';
 
 type Phase = 'analyzing' | 'review' | 'error';
 
@@ -36,19 +37,41 @@ export default function AnalyzeSheet({
     (async () => {
       try {
         const { base64, mediaType } = await toAnalyzePayload(file);
-        const res = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, mediaType, provider: getPreferredProvider() ?? undefined }),
-        });
-        const data = await res.json();
-        if (cancelled) return;
-        if (!res.ok) {
-          setError(data.error || '分析失敗');
-          setPhase('error');
-          return;
+        const provider = getPreferredProvider();
+        let result: AnalyzeResult;
+
+        if (provider === 'local') {
+          // 本機模式：瀏覽器直連裝置上的模型，截圖不經過伺服器
+          const cfg = getLocalConfig();
+          if (!cfg) {
+            setError('尚未完成本機模式設置，請到 ⚙️ 設定 → 本機模式。');
+            setPhase('error');
+            return;
+          }
+          try {
+            result = await analyzeLocal(cfg, { base64, mediaType });
+          } catch (e) {
+            if (cancelled) return;
+            setError(e instanceof Error ? e.message : '本機分析失敗');
+            setPhase('error');
+            return;
+          }
+        } else {
+          const res = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64, mediaType, provider: provider ?? undefined }),
+          });
+          const data = await res.json();
+          if (cancelled) return;
+          if (!res.ok) {
+            setError(data.error || '分析失敗');
+            setPhase('error');
+            return;
+          }
+          result = data as AnalyzeResult;
         }
-        const result = data as AnalyzeResult;
+        if (cancelled) return;
         if (!result.is_food_content || result.restaurants.length === 0) {
           setError('這張截圖裡沒有找到餐廳資訊，換一張試試？');
           setPhase('error');
