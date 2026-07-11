@@ -10,13 +10,20 @@ const BACKUP_NAME = 'food-map-backup.json';
 const LAST_BACKUP_KEY = 'food-map:drive-last-backup';
 
 export function isDriveConfigured(): boolean {
-  return !!CLIENT_ID;
+  // 殼內走原生授權（靠 Android OAuth client 的 package+SHA-1），不需要 web client ID
+  return !!CLIENT_ID || hasNativeGoogleAuth();
 }
 
 /** Capacitor 殼的 WebView 會被 Google OAuth 擋（disallowed_useragent） */
 export function isInCapacitorShell(): boolean {
   if (typeof window === 'undefined') return false;
   return !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
+/** 殼內是否有原生 Google 授權 plugin（舊版 APK 沒有 → 需更新 App） */
+export function hasNativeGoogleAuth(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!(window as any).Capacitor?.Plugins?.GoogleAuth;
 }
 
 export function getLastBackupTime(): string | null {
@@ -50,6 +57,18 @@ let tokenCache: { token: string; exp: number } | null = null;
 
 async function getToken(): Promise<string> {
   if (tokenCache && Date.now() < tokenCache.exp - 60_000) return tokenCache.token;
+
+  // Capacitor 殼內：WebView 跑不了 GIS popup，改走原生 Google 授權 plugin
+  if (isInCapacitorShell()) {
+    const native = (window as any).Capacitor?.Plugins?.GoogleAuth;
+    if (!native) throw new Error('App 版本過舊，請更新後再使用雲端備份');
+    const { accessToken } = await native.getAccessToken();
+    if (!accessToken) throw new Error('Google 授權失敗');
+    // 原生流程拿不到 expires_in，保守抓 45 分鐘；過期會被 401 重授權接住
+    tokenCache = { token: accessToken, exp: Date.now() + 45 * 60_000 };
+    return accessToken;
+  }
+
   await loadGsi();
   return new Promise((resolve, reject) => {
     const client = (window as any).google.accounts.oauth2.initTokenClient({

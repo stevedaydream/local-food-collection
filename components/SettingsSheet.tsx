@@ -7,6 +7,7 @@ import { exportJson, importJson } from '@/lib/store';
 import {
   backupToDrive,
   getLastBackupTime,
+  hasNativeGoogleAuth,
   isDriveConfigured,
   isInCapacitorShell,
   restoreFromDrive,
@@ -167,10 +168,10 @@ export default function SettingsSheet({
             伺服器尚未設定 NEXT_PUBLIC_GOOGLE_CLIENT_ID，暫時無法使用雲端備份。
             仍可用名單下方的「匯出備份 / 匯入」手動備份。
           </p>
-        ) : isInCapacitorShell() ? (
+        ) : isInCapacitorShell() && !hasNativeGoogleAuth() ? (
           <p className="meta" style={{ fontSize: 12.5 }}>
-            Android App 殼內暫不支援 Google 登入，請改用瀏覽器或 PWA 版備份，
-            或用名單下方的「匯出備份 / 匯入」。
+            這個版本的 App 尚不支援 Google 登入，請更新 App，
+            或改用瀏覽器 / PWA 版備份、名單下方的「匯出備份 / 匯入」。
           </p>
         ) : (
           <>

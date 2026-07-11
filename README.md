@@ -18,7 +18,7 @@
   - Android：在任何 App 截圖後按「分享」→ 選「美食地圖」，直接進入 AI 分析（Web Share Target）
   - iOS：加入主畫面後從相簿分享或 App 內上傳（iOS 尚不支援 PWA share target，見 Roadmap）
 - 💾 **資料在你手上**：收藏存在裝置 localStorage，支援 JSON 匯出備份 / 匯入
-- ☁️ **Google Drive 備份（免設定）**：⚙️ 設定內一鍵備份 / 還原——備份存在使用者自己 Drive 的隱藏應用程式空間（`drive.appdata` scope，App 碰不到其他檔案）；開發者只需設定一次 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`（見 `.env.example`），使用者只要選 Google 帳號。還原採合併（依 id 去重），換新機直接還原即可。Android Capacitor 殼內因 Google 擋 WebView OAuth 暫不支援，請用瀏覽器 / PWA
+- ☁️ **Google Drive 備份（免設定）**：⚙️ 設定內一鍵備份 / 還原——備份存在使用者自己 Drive 的隱藏應用程式空間（`drive.appdata` scope，App 碰不到其他檔案）；開發者只需設定一次 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`（見 `.env.example`），使用者只要選 Google 帳號。還原採合併（依 id 去重），換新機直接還原即可。Android 殼內走原生 Google 授權（見下方 Android 章節）
 
 ## AI 引擎（四種可選）
 
@@ -83,7 +83,8 @@ npm run dev                 # http://localhost:3000
 | `components/DiceRoll.tsx` | 全屏 2 秒骰子滾動動畫 |
 | `lib/geo.ts` | 取得定位（Capacitor 原生 / 瀏覽器，失敗退回台北） |
 | `lib/store.ts` | localStorage 收藏 CRUD、匯出/匯入、Google Maps 連結產生 |
-| `lib/google-drive.ts` | Google Drive 備份/還原（GIS token + appDataFolder，純前端） |
+| `lib/google-drive.ts` | Google Drive 備份/還原（appDataFolder；瀏覽器走 GIS、殼內走原生授權） |
+| `lib/native-share.ts` | 殼內接收原生分享的截圖（ShareReceiverPlugin → Blob） |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |
 | `components/RandomSheet.tsx` | 隨機推薦（可依料理類型篩選） |
 | `components/EditSheet.tsx` | 手動新增 / 編輯收藏（共用表單，地址變更會重新地理編碼） |
@@ -101,7 +102,22 @@ Capacitor 殼，WebView 直接載入 `https://local-food-collection.vercel.app`�
 - **🎲 吃什麼（1×1 按鈕）**：`DiceWidgetProvider`，點了開 App 並直接彈出隨機推薦（`?random=1`）
 - **隨機餐廳卡片（4×2）**：`RandomFoodWidgetProvider`，直接顯示一家口袋餐廳，可「換一家」、開 Google Maps 導航、點卡片開 App
 
-資料流：`lib/store.ts` 每次寫入（+ App 開啟時）→ `lib/widget-sync.ts` 呼叫原生 `WidgetSyncPlugin` → SharedPreferences → widget 重繪。widget 資料來源是**殼內 WebView 的 localStorage**，與 Chrome/PWA 的收藏是分開的。
+資料流：`lib/store.ts` 每次寫入（+ App 開啟時）→ `lib/widget-sync.ts` 呼叫原生 `WidgetSyncPlugin` → SharedPreferences → widget 重繪。widget 資料來源是**殼內 WebView 的 localStorage**，與 Chrome/PWA 的收藏是分開的（可用 Google Drive 備份/還原或 JSON 匯出/匯入互通）。
+
+### 殼內接收分享截圖（原生 ACTION_SEND）
+
+PWA 的 Web Share Target 只對 Chrome 安裝的 PWA 生效；殼 App 另外用原生 intent-filter 接收：
+任何 App 截圖 → 分享 → 選「口袋美食地圖」→ `MainActivity` 讀圖存進 `ShareReceiverPlugin` →
+WebView 載入 `/?share-native=1` → 網頁端（`lib/native-share.ts`）取圖直接進 AI 分析流程。
+
+### 殼內 Google Drive 備份（原生授權）
+
+Google 擋 WebView 內的 OAuth（`disallowed_useragent`），殼內改走 Play Services 的
+AuthorizationClient 原生流程（`GoogleAuthPlugin`）取 access token，再交給 `lib/google-drive.ts`
+打同一套 Drive REST。**開發者需在 Google Cloud Console 多註冊一個「Android」類型的 OAuth
+client**（同一個專案）：package name 填 `com.stevedaydream.localfood`，SHA-1 用
+`cd android && ./gradlew signingReport` 查（debug 與 release 簽章各註冊一個）。不需要任何金鑰或
+google-services.json，Google 是靠 package + 簽章比對放行。
 
 ```bash
 npx cap sync android                          # 改過 capacitor.config.ts 後同步

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, updateRestaurant } from '@/lib/store';
 import { syncToWidget } from '@/lib/widget-sync';
+import { takePendingSharedImage } from '@/lib/native-share';
 import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
@@ -50,6 +51,13 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     // 主畫面捷徑「🎲 吃什麼」直接彈出隨機推薦
     if (params.get('random') === '1') setShowRandom(true);
+
+    // Capacitor 殼內分享截圖進來（原生 ACTION_SEND）：跟原生 plugin 取圖
+    if (params.get('share-native') === '1') {
+      takePendingSharedImage().then((b) => {
+        if (b) setAnalyzeFile(b);
+      });
+    }
 
     // Android 分享截圖進來（Web Share Target）：service worker 把圖放進 cache
     if (params.get('share-target') === '1') {
