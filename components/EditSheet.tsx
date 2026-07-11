@@ -20,6 +20,7 @@ export default function EditSheet({
   const [priceRange, setPriceRange] = useState(initial?.priceRange ?? '');
   const [dishes, setDishes] = useState(initial?.dishes.join('、') ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [shared, setShared] = useState(initial?.visibility === 'friends');
   const [saving, setSaving] = useState(false);
   const [looking, setLooking] = useState(false);
   const [lookupMsg, setLookupMsg] = useState('');
@@ -92,6 +93,7 @@ export default function EditSheet({
       lng,
       thumb: initial?.thumb ?? null,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
+      visibility: shared ? 'friends' : 'private',
     });
   }
 
@@ -142,6 +144,20 @@ export default function EditSheet({
           <label>備註</label>
           <input value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 4px', fontSize: 14 }}>
+          <input
+            type="checkbox"
+            style={{ width: 'auto' }}
+            checked={shared}
+            onChange={(e) => setShared(e.target.checked)}
+          />
+          <span>
+            👥 分享給朋友
+            <span className="meta" style={{ display: 'block', fontSize: 12 }}>
+              需登入並加好友；對方會看到這筆的全部欄位（含備註與縮圖）
+            </span>
+          </span>
+        </label>
         <div className="sheet-actions">
           <button className="btn secondary" onClick={onClose} disabled={saving}>
             取消

@@ -14,6 +14,7 @@ import {
   type AccountInfo,
 } from '@/lib/auth';
 import { clearSyncState, pullAndMerge } from '@/lib/cloud-sync';
+import { tryAcceptPendingInvite } from '@/lib/friends';
 import {
   backupToDrive,
   getLastBackupTime,
@@ -59,6 +60,9 @@ export default function SettingsSheet({
         onRestored(merged);
         setAuthMsg({ text: `✅ 同步完成，目前共 ${merged.length} 家收藏` });
       }
+      // 開邀請連結但當時未登入 → 現在補加好友
+      const inviteMsg = await tryAcceptPendingInvite();
+      if (inviteMsg) setAuthMsg({ text: inviteMsg });
     } catch (e) {
       setAuthMsg({ text: e instanceof Error ? e.message : String(e), error: true });
     }

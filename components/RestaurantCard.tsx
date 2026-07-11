@@ -114,6 +114,7 @@ export default function RestaurantCard({
             {r.notes ? <div>📝 {r.notes}</div> : null}
           </div>
           <div className="chips">
+            {r.visibility === 'friends' && <span className="chip">👥 已分享</span>}
             {r.cuisine && <span className="chip accent">{r.cuisine}</span>}
             {r.priceRange && <span className="chip">{r.priceRange}</span>}
             {r.sourcePlatform && <span className="chip">來自 {r.sourcePlatform}</span>}

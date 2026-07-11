@@ -49,11 +49,12 @@ function toRow(r: SavedRestaurant, ownerId: string) {
     lat: r.lat,
     lng: r.lng,
     thumb: r.thumb,
+    visibility: r.visibility ?? 'private',
     created_at: r.createdAt,
   };
 }
 
-function fromRow(row: any): SavedRestaurant {
+export function fromRow(row: any): SavedRestaurant {
   return {
     id: row.id,
     name: row.name,
@@ -68,6 +69,7 @@ function fromRow(row: any): SavedRestaurant {
     lng: row.lng,
     thumb: row.thumb,
     createdAt: row.created_at,
+    visibility: row.visibility === 'friends' ? 'friends' : 'private',
   };
 }
 

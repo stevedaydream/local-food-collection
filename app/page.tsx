@@ -12,6 +12,8 @@ import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
 import EditSheet from '@/components/EditSheet';
 import SettingsSheet from '@/components/SettingsSheet';
+import FriendsSheet from '@/components/FriendsSheet';
+import { stashPendingInvite, tryAcceptPendingInvite } from '@/lib/friends';
 // 地圖暫時下架；MapView 保留為未來 Google Maps API 的接口（components/MapView.tsx）
 
 export default function Home() {
@@ -20,6 +22,7 @@ export default function Home() {
   const [analyzeFile, setAnalyzeFile] = useState<Blob | null>(null);
   const [showRandom, setShowRandom] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   /** EditSheet 狀態：null=關閉、'new'=手動新增、物件=編輯該筆 */
   const [editTarget, setEditTarget] = useState<SavedRestaurant | 'new' | null>(null);
   // 條件篩選（空字串 = 不篩）
@@ -64,6 +67,21 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     // 主畫面捷徑「🎲 吃什麼」直接彈出隨機推薦
     if (params.get('random') === '1') setShowRandom(true);
+
+    // 朋友邀請連結：已登入直接接受；未登入先暫存並引導去設定登入
+    const inviteCode = params.get('invite');
+    if (inviteCode) {
+      stashPendingInvite(inviteCode);
+      tryAcceptPendingInvite().then((msg) => {
+        if (msg) {
+          alert(msg);
+          setShowFriends(true);
+        } else {
+          alert('請先用 Google 登入，登入後會自動加為好友');
+          setShowSettings(true);
+        }
+      });
+    }
 
     // Capacitor 殼內分享截圖進來（原生 ACTION_SEND）：跟原生 plugin 取圖
     if (params.get('share-native') === '1') {
@@ -129,6 +147,9 @@ export default function Home() {
         </h1>
         <span className="meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {restaurants.length} 家收藏
+          <button className="icon-btn" onClick={() => setShowFriends(true)} aria-label="朋友">
+            👥
+          </button>
           <button className="icon-btn" onClick={() => setShowSettings(true)} aria-label="設定">
             ⚙️
           </button>
@@ -253,6 +274,9 @@ export default function Home() {
       )}
       {showSettings && (
         <SettingsSheet onClose={() => setShowSettings(false)} onRestored={setRestaurants} />
+      )}
+      {showFriends && (
+        <FriendsSheet onClose={() => setShowFriends(false)} onListChanged={setRestaurants} />
       )}
     </main>
   );

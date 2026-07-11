@@ -14,6 +14,8 @@ export interface SavedRestaurant {
   /** 縮圖 (data URL, 已壓縮) */
   thumb: string | null;
   createdAt: string;
+  /** 雲端分享範圍；未設定視為 private（僅自己） */
+  visibility?: 'private' | 'friends';
 }
 
 /** AI 從截圖抽出的單一餐廳（尚未儲存） */

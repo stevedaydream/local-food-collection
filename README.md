@@ -28,7 +28,14 @@
 - 同步：開頁時 pull 合併（同 id 以雲端為準、「曾同步過但雲端已刪」不復活）；每次本機寫入 debounce 2 秒全量 push（upsert + 刪多餘列）；未登入/離線自動降級純 localStorage
 - Schema：`profiles` + `restaurants`（owner-only RLS；`visibility` 欄位已預留 Phase 2 朋友分享）
 - 開發者設定：`.env.example` 的 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`，並在 Supabase Dashboard → Authentication → Google provider 啟用 + 把 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 加進 Client IDs
-- Roadmap：Phase 2 邀請連結 + 朋友互看（`friendships` 表 + RLS）；Phase 3 opt-in 公共美食庫（只收客觀欄位，notes/截圖不進公共庫）
+### 朋友分享（Phase 2）
+
+- 主畫面右上 **👥** → 產生邀請連結（7 天有效）傳給朋友；對方登入後點開自動成為好友（未登入會先引導登入、登入完自動補加）
+- 收藏在編輯表單勾「**👥 分享給朋友**」才會被好友看到（含備註與縮圖；預設全部私人），卡片會標「👥 已分享」
+- 好友清單可「📋 看清單」瀏覽對方分享的收藏、📍 導航、「➕ 收藏」複製進自己名單（以店名+地址判斷已收藏過）
+- 後端：`invites` / `friendships`（單列 `user_a<user_b`）；加好友只能走 `accept_invite` RPC（SECURITY DEFINER，advisors 對它的警告屬預期）；`restaurants` 追加「朋友可讀 visibility='friends'」的 RLS policy
+
+Roadmap：Phase 3 opt-in 公共美食庫（只收客觀欄位，notes/截圖不進公共庫）
 
 ## AI 引擎（四種可選）
 
@@ -159,7 +166,7 @@ CI 簽章需在 GitHub repo → Settings → Secrets and variables → Actions �
 - [ ] **iOS widget**：需 WidgetKit；過渡方案：iOS 可用「捷徑」App 建一個開啟 `https://你的網址/?random=1` 的捷徑放主畫面
 - [ ] **iOS 分享截圖進 App**：用「捷徑」建立分享表單捷徑，把圖片 POST 到 `/api/analyze`
 - [x] **跨裝置同步**：Supabase Auth（Google 登入）+ Postgres 同步（見「帳號與雲端同步」）
-- [ ] **朋友分享（Phase 2）**：邀請連結加好友、互看分享清單
+- [x] **朋友分享（Phase 2）**：邀請連結加好友、互看分享清單（見「帳號與雲端同步」）
 - [ ] **公共美食庫（Phase 3）**：opt-in 貢獻 + Google Sheet 人工審核台
 - [ ] 依目前位置排序／「附近的口袋名單」推薦
 - [ ] 已吃過 / 想吃 狀態與評分
