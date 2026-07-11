@@ -32,7 +32,17 @@
 | 自訂 Endpoint | `CUSTOM_BASE_URL` | `CUSTOM_MODEL`、`CUSTOM_API_KEY` | `gemma-3-27b-it` |
 
 - `AI_PROVIDER` 指定伺服器預設（`anthropic` / `gpt` / `gemini` / `custom`），未設定則取第一個有金鑰的
-- **自訂 Endpoint** 走 OpenAI 相容 API（`{CUSTOM_BASE_URL}/chat/completions`），之後要接手機/本機部署的 Gemma（llama.cpp、Ollama、vLLM 等）只要填 URL 和模型名即可；考量本機模型多半不支援 structured output，這條路徑改用 prompt 要求 JSON + 容錯解析
+- **自訂 Endpoint** 走 OpenAI 相容 API（`{CUSTOM_BASE_URL}/chat/completions`），適合接自架的推論服務；考量本機模型多半不支援 structured output，這條路徑改用 prompt 要求 JSON + 容錯解析
+
+### 📱 本機模式（第五種：瀏覽器直連，截圖不上雲）
+
+除了上面四種「伺服器端」引擎，App 內建**本機模式**：瀏覽器直接連你裝置上的
+OpenAI 相容模型伺服器（Ollama / LM Studio / llama.cpp / Termux+Ollama 等），截圖完全不離開裝置。
+
+- 到 App 右上角 ⚙️ → 「本機模式」→ 跟著三步驟教學精靈設置（內建 Ollama / LM Studio / llama.cpp / Android 手機範本、CORS 指令、連線測試）
+- 模型需支援 vision（例如 `gemma3:12b`、手機用 `gemma3:4b`）
+- **HTTPS 限制**：本站是 HTTPS，瀏覽器只允許直連 `localhost`（模型跑在同一台裝置）；要連區網其他機器請用 Tailscale（`tailscale serve`）或 ngrok 提供 https:// 網址——設置畫面會自動偵測並提示
+- 常見 CORS 設定：Ollama 用 `OLLAMA_ORIGINS="*" ollama serve`；LM Studio 開啟 Enable CORS；llama.cpp 預設即允許
 
 ## 快速開始
 
@@ -61,7 +71,10 @@ npm run dev                 # http://localhost:3000
 | 路徑 | 說明 |
 |---|---|
 | `app/api/analyze/route.ts` | 截圖分析入口，依 provider 分派 |
-| `lib/ai-providers.ts` | 四種 AI provider 實作（Anthropic structured output / OpenAI json_schema / Gemini JSON mode / 自訂 OpenAI 相容） |
+| `lib/ai-providers.ts` | 伺服器端四種 provider 實作（Anthropic structured output / OpenAI json_schema / Gemini JSON mode / 自訂 OpenAI 相容） |
+| `lib/analyze-shared.ts` | 前後端共用：prompt、JSON schema、容錯解析、OpenAI 相容 request 組裝 |
+| `lib/local-mode.ts` | 本機模式：瀏覽器直連本機模型、連線測試、混合內容偵測 |
+| `components/LocalSetupSheet.tsx` | 本機模式三步驟教學精靈（範本 + CORS 指令 + 連線測試） |
 | `app/api/providers/route.ts` | 回傳已設定的 provider 清單給設定畫面 |
 | `app/api/geocode/route.ts` | 地址 → 座標（OpenStreetMap Nominatim 代理，含快取） |
 | `app/api/place-search/route.ts` | 店名 → 地址+座標（有 `GOOGLE_MAPS_API_KEY` 走 Google Places，否則 Nominatim） |
