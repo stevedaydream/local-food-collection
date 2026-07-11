@@ -391,6 +391,26 @@ export default function SettingsSheet({
             )}
           </>
         )}
+        {!isInCapacitorShell() && (
+          <>
+            <h2 style={{ marginTop: 22 }}>📲 Android App</h2>
+            <p className="meta" style={{ fontSize: 12.5 }}>
+              安裝 App 版可直接分享截圖給美食收集，用起來更順手。
+            </p>
+            <div className="sheet-actions" style={{ marginTop: 10 }}>
+              <a
+                className="btn secondary"
+                href="https://github.com/stevedaydream/local-food-collection/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none', textAlign: 'center' }}
+              >
+                ⬇️ 下載 Android App（GitHub Releases）
+              </a>
+            </div>
+          </>
+        )}
+
         <div className="sheet-actions">
           <button className="btn secondary" onClick={onClose}>
             完成
