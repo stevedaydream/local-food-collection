@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NearbyPlace, SavedRestaurant } from '@/lib/types';
 import { mapsUrl } from '@/lib/store';
 import { getPosition } from '@/lib/geo';
+import { fetchPublicNearby } from '@/lib/public-pool';
 import DiceRoll from './DiceRoll';
 
 type Mode = 'pocket' | 'nearby';
@@ -85,9 +86,15 @@ export default function RandomSheet({
     setNearbyError('');
     try {
       const pos = await getPosition();
-      const res = await fetch(`/api/nearby?lat=${pos.lat}&lng=${pos.lng}`);
+      // 地圖來源 + 公共美食庫並行查詢，公共庫失敗不影響主流程
+      const [res, pubPlaces] = await Promise.all([
+        fetch(`/api/nearby?lat=${pos.lat}&lng=${pos.lng}`),
+        fetchPublicNearby(pos.lat, pos.lng).catch(() => [] as NearbyPlace[]),
+      ]);
       const data = (await res.json()) as { places?: NearbyPlace[]; source?: string };
-      const list = (data.places ?? []).map(nearbyToCandidate);
+      const seen = new Set((data.places ?? []).map((p) => p.name));
+      const merged = [...(data.places ?? []), ...pubPlaces.filter((p) => !seen.has(p.name))];
+      const list = merged.map(nearbyToCandidate);
       setNearbyNote(
         (pos.fallback ? '定位失敗，先以台北市中心搜尋' : '已用目前位置搜尋') +
           (data.source === 'osm' ? '・OSM 資料（設定 Google key 結果更準）' : ''),

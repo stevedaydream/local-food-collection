@@ -16,6 +16,13 @@ import {
 import { clearSyncState, pullAndMerge } from '@/lib/cloud-sync';
 import { tryAcceptPendingInvite } from '@/lib/friends';
 import {
+  CONTRIBUTE_CONSENT,
+  contributeMyList,
+  getContributionStats,
+  revokeMyContributions,
+  type ContributionStats,
+} from '@/lib/public-pool';
+import {
   backupToDrive,
   getLastBackupTime,
   hasNativeGoogleAuth,
@@ -103,7 +110,47 @@ export default function SettingsSheet({
     await signOut();
     clearSyncState();
     setAccount(null);
+    setPubStats(null);
     setAuthMsg({ text: '已登出，收藏仍保留在這台裝置上' });
+  };
+
+  // 公共美食庫
+  const [pubStats, setPubStats] = useState<ContributionStats | null>(null);
+  const [pubBusy, setPubBusy] = useState(false);
+  const [pubMsg, setPubMsg] = useState<{ text: string; error?: boolean } | null>(null);
+
+  useEffect(() => {
+    if (account && account !== 'loading') getContributionStats().then(setPubStats).catch(() => {});
+  }, [account]);
+
+  const handleContribute = async () => {
+    if (!confirm(CONTRIBUTE_CONSENT)) return;
+    setPubBusy(true);
+    setPubMsg(null);
+    try {
+      const n = await contributeMyList(loadRestaurants());
+      setPubStats(await getContributionStats());
+      setPubMsg({ text: n ? `✅ 已送出 ${n} 家等待審核，感謝貢獻！` : '沒有新的可送出（都送過了）' });
+    } catch (e) {
+      setPubMsg({ text: e instanceof Error ? e.message : String(e), error: true });
+    } finally {
+      setPubBusy(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (!confirm('確定要撤回你全部的貢獻？已收錄進公共庫的也會一併移除。')) return;
+    setPubBusy(true);
+    setPubMsg(null);
+    try {
+      const n = await revokeMyContributions();
+      setPubStats(await getContributionStats());
+      setPubMsg({ text: `已撤回 ${n} 筆貢獻` });
+    } catch (e) {
+      setPubMsg({ text: e instanceof Error ? e.message : String(e), error: true });
+    } finally {
+      setPubBusy(false);
+    }
   };
 
   const handleBackup = async () => {
@@ -277,6 +324,36 @@ export default function SettingsSheet({
             )}
           </>
         )}
+        {account && account !== 'loading' && (
+          <>
+            <h2 style={{ marginTop: 22 }}>🌍 公共美食庫</h2>
+            <p className="meta" style={{ fontSize: 12.5 }}>
+              自願把收藏的客觀資訊（店名、地址、類型等）貢獻給所有使用者共享的公共美食庫，
+              審核後會出現在大家的「📍 附近」推薦裡。<b>不會</b>上傳備註、截圖與收藏來源，隨時可撤回。
+              {pubStats && (pubStats.pending || pubStats.approved || pubStats.rejected) ? (
+                <span style={{ display: 'block' }}>
+                  我的貢獻：待審核 {pubStats.pending}・已收錄 {pubStats.approved}
+                </span>
+              ) : null}
+            </p>
+            <div className="sheet-actions" style={{ marginTop: 10 }}>
+              <button className="btn secondary" disabled={pubBusy} onClick={handleContribute}>
+                {pubBusy ? <span className="spinner" /> : '🌍 貢獻我的清單'}
+              </button>
+              {pubStats && pubStats.pending + pubStats.approved + pubStats.rejected > 0 && (
+                <button className="btn secondary" disabled={pubBusy} onClick={handleRevoke}>
+                  撤回全部
+                </button>
+              )}
+            </div>
+            {pubMsg && (
+              <p className={pubMsg.error ? 'error-text' : 'meta'} style={{ fontSize: 12.5, marginTop: 8 }}>
+                {pubMsg.text}
+              </p>
+            )}
+          </>
+        )}
+
         <h2 style={{ marginTop: 22 }}>☁️ Google Drive 備份</h2>
         {!isDriveConfigured() ? (
           <p className="meta" style={{ fontSize: 12.5 }}>

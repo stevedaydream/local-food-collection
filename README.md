@@ -35,7 +35,14 @@
 - 好友清單可「📋 看清單」瀏覽對方分享的收藏、📍 導航、「➕ 收藏」複製進自己名單（以店名+地址判斷已收藏過）
 - 後端：`invites` / `friendships`（單列 `user_a<user_b`）；加好友只能走 `accept_invite` RPC（SECURITY DEFINER，advisors 對它的警告屬預期）；`restaurants` 追加「朋友可讀 visibility='friends'」的 RLS policy
 
-Roadmap：Phase 3 opt-in 公共美食庫（只收客觀欄位，notes/截圖不進公共庫）
+### 公共美食庫（Phase 3）
+
+- **opt-in 貢獻**：⚙️ 設定 →「🌍 公共美食庫」→「貢獻我的清單」，按下時彈出同意聲明——只上傳客觀欄位（店名、地址、地區、類型、推薦菜色、價位、座標），**備註、截圖、收藏來源絕不上傳**；「撤回全部」會連已收錄進公共庫的列一起刪（`revoke_my_contributions` RPC）
+- **審核台（Google Sheet + GAS）**：`scripts/gas-review.gs` 貼進 Sheet 的 Apps Script，指令碼屬性設 `SERVICE_ROLE_KEY`（僅放 GAS，勿進前端）→ 選單「⬇️ 拉取待審核」→ 審核欄選 通過/拒絕 →「⬆️ 送出」；通過走 `review_contribution` RPC 寫入 `public_places`（同店名+地址自動去重）
+- **回饋使用者**：「📍 附近」隨機推薦會把 1.5km 內的公共庫店家併入候選（與地圖來源同名去重），不用登入也吃得到
+- 資料表：`public_contributions`（貢獻者本人 RLS）＋ `public_places`（全員可讀、只有審核 RPC 能寫）
+
+Roadmap：資料量大後可換 PostGIS 半徑查詢、公共庫瀏覽頁
 
 ## AI 引擎（四種可選）
 
@@ -167,7 +174,7 @@ CI 簽章需在 GitHub repo → Settings → Secrets and variables → Actions �
 - [ ] **iOS 分享截圖進 App**：用「捷徑」建立分享表單捷徑，把圖片 POST 到 `/api/analyze`
 - [x] **跨裝置同步**：Supabase Auth（Google 登入）+ Postgres 同步（見「帳號與雲端同步」）
 - [x] **朋友分享（Phase 2）**：邀請連結加好友、互看分享清單（見「帳號與雲端同步」）
-- [ ] **公共美食庫（Phase 3）**：opt-in 貢獻 + Google Sheet 人工審核台
+- [x] **公共美食庫（Phase 3）**：opt-in 貢獻 + Google Sheet 人工審核台（見「帳號與雲端同步」）
 - [ ] 依目前位置排序／「附近的口袋名單」推薦
 - [ ] 已吃過 / 想吃 狀態與評分
 
