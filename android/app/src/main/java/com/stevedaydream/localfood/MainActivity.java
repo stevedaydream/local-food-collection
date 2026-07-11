@@ -28,6 +28,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetSyncPlugin.class);
         registerPlugin(ShareReceiverPlugin.class);
         registerPlugin(GoogleAuthPlugin.class);
+        registerPlugin(AppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
         googleAuthLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartIntentSenderForResult(),

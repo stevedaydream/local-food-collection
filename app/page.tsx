@@ -5,6 +5,7 @@ import type { SavedRestaurant } from '@/lib/types';
 import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, updateRestaurant } from '@/lib/store';
 import { syncToWidget } from '@/lib/widget-sync';
 import { takePendingSharedImage } from '@/lib/native-share';
+import { checkApkUpdate } from '@/lib/app-update';
 import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
 import RandomSheet from '@/components/RandomSheet';
@@ -45,8 +46,9 @@ export default function Home() {
     const loaded = loadRestaurants();
     setRestaurants(loaded);
     setReady(true);
-    // Capacitor 殼內：開 App 時把名單種子同步給原生 widget
+    // Capacitor 殼內：開 App 時把名單種子同步給原生 widget、檢查 APK 是否有新版
     syncToWidget(loaded);
+    checkApkUpdate();
 
     const params = new URLSearchParams(window.location.search);
     // 主畫面捷徑「🎲 吃什麼」直接彈出隨機推薦

@@ -127,6 +127,22 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 > Gradle 建置需 JDK 17–21（系統 Java 25 太新，可用 Android Studio 內建 JBR：設 `JAVA_HOME` 指向 `Android Studio/jbr`）。
 
+### Release 與 App 內自動更新
+
+發版：跑專案根目錄的 **`release.bat`** → 輸入新版號 → 自動改 `versionName`/`versionCode`、
+commit、上 tag `v*`、push → GitHub Actions（`.github/workflows/release-android.yml`）建
+release APK 並掛上 GitHub Release。
+
+App 內自動更新：殼開啟時（`lib/app-update.ts`，每天最多查一次）比對 APK 版本與 GitHub Releases
+最新 tag，有新版跳確認 → 系統瀏覽器直接下載 APK 安裝（`AppUpdatePlugin`）。瀏覽器 / PWA 不受影響，
+網頁本身跟著 Vercel 部署走。
+
+CI 簽章需在 GitHub repo → Settings → Secrets and variables → Actions 設定：
+`ANDROID_KEYSTORE_BASE64`（keystore 檔 base64）、`ANDROID_KEYSTORE_PASSWORD`、
+`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`（選填，預設同 store 密碼）。
+**簽章要跟手機上已安裝版本一致**才能覆蓋安裝，且 SHA-1 要註冊在 Google 的 Android OAuth client
+（Drive 備份用）——換 keystore 就要重新註冊 SHA-1 並重裝 App。
+
 ## Roadmap
 
 - [x] **真正的主畫面 widget（Android）**：Capacitor 殼 + RemoteViews widget（見上）
