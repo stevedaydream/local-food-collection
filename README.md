@@ -18,6 +18,7 @@
   - Android：在任何 App 截圖後按「分享」→ 選「美食地圖」，直接進入 AI 分析（Web Share Target）
   - iOS：加入主畫面後從相簿分享或 App 內上傳（iOS 尚不支援 PWA share target，見 Roadmap）
 - 💾 **資料在你手上**：收藏存在裝置 localStorage，支援 JSON 匯出備份 / 匯入
+- ☁️ **Google Drive 備份（免設定）**：⚙️ 設定內一鍵備份 / 還原——備份存在使用者自己 Drive 的隱藏應用程式空間（`drive.appdata` scope，App 碰不到其他檔案）；開發者只需設定一次 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`（見 `.env.example`），使用者只要選 Google 帳號。還原採合併（依 id 去重），換新機直接還原即可。Android Capacitor 殼內因 Google 擋 WebView OAuth 暫不支援，請用瀏覽器 / PWA
 
 ## AI 引擎（四種可選）
 
@@ -69,6 +70,7 @@ npm run dev                 # http://localhost:3000
 | `components/DiceRoll.tsx` | 全屏 2 秒骰子滾動動畫 |
 | `lib/geo.ts` | 取得定位（Capacitor 原生 / 瀏覽器，失敗退回台北） |
 | `lib/store.ts` | localStorage 收藏 CRUD、匯出/匯入、Google Maps 連結產生 |
+| `lib/google-drive.ts` | Google Drive 備份/還原（GIS token + appDataFolder，純前端） |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |
 | `components/RandomSheet.tsx` | 隨機推薦（可依料理類型篩選） |
 | `components/EditSheet.tsx` | 手動新增 / 編輯收藏（共用表單，地址變更會重新地理編碼） |

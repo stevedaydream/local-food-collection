@@ -230,7 +230,9 @@ export default function Home() {
           onClose={() => setEditTarget(null)}
         />
       )}
-      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsSheet onClose={() => setShowSettings(false)} onRestored={setRestaurants} />
+      )}
     </main>
   );
 }
