@@ -11,10 +11,12 @@ export default function RestaurantCard({
   r,
   onEdit,
   onDelete,
+  onToggleFavorite,
 }: {
   r: SavedRestaurant;
   onEdit: (r: SavedRestaurant) => void;
   onDelete: (id: string) => void;
+  onToggleFavorite: (r: SavedRestaurant) => void;
 }) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -126,6 +128,14 @@ export default function RestaurantCard({
           </div>
         </div>
         <div className="card-actions">
+          <button
+            className="icon-btn"
+            style={{ fontSize: 17, lineHeight: 1 }}
+            aria-label={r.favorite ? '移出我的最愛' : '加入我的最愛'}
+            onClick={() => onToggleFavorite(r)}
+          >
+            {r.favorite ? '❤️' : '🤍'}
+          </button>
           <a className="nav-link" href={mapsUrl(r)} target="_blank" rel="noreferrer" draggable={false}>
             📍 導航
           </a>

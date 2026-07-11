@@ -29,6 +29,7 @@ export default function Home() {
   const [fSource, setFSource] = useState('');
   const [fCity, setFCity] = useState('');
   const [fCuisine, setFCuisine] = useState('');
+  const [fFavorite, setFFavorite] = useState(false);
 
   const uniq = (xs: (string | null)[]) =>
     Array.from(new Set(xs.filter((x): x is string => !!x))).sort();
@@ -38,11 +39,12 @@ export default function Home() {
 
   const filtered = restaurants.filter(
     (r) =>
+      (!fFavorite || r.favorite) &&
       (!fSource || r.sourcePlatform === fSource) &&
       (!fCity || r.city === fCity) &&
       (!fCuisine || r.cuisine === fCuisine),
   );
-  const filterOn = !!(fSource || fCity || fCuisine);
+  const filterOn = !!(fSource || fCity || fCuisine || fFavorite);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
@@ -122,6 +124,10 @@ export default function Home() {
     setEditTarget(null);
   };
 
+  const handleToggleFavorite = (r: SavedRestaurant) => {
+    setRestaurants(updateRestaurant({ ...r, favorite: !r.favorite }));
+  };
+
   const handleExport = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' });
     const a = document.createElement('a');
@@ -159,6 +165,15 @@ export default function Home() {
       <section className="content">
         {ready && restaurants.length > 0 && (
           <div className="filter-bar">
+            <button
+              className="icon-btn"
+              style={fFavorite ? { background: 'var(--surface-2)', outline: '2px solid var(--accent)', outlineOffset: -1 } : undefined}
+              aria-label="只看我的最愛"
+              aria-pressed={fFavorite}
+              onClick={() => setFFavorite((v) => !v)}
+            >
+              {fFavorite ? '❤️ 最愛' : '🤍 最愛'}
+            </button>
             <select value={fSource} onChange={(e) => setFSource(e.target.value)} aria-label="來源篩選">
               <option value="">來源</option>
               {sources.map((s) => (
@@ -190,6 +205,7 @@ export default function Home() {
                   setFSource('');
                   setFCity('');
                   setFCuisine('');
+                  setFFavorite(false);
                 }}
               >
                 ✕ 清除
@@ -214,7 +230,13 @@ export default function Home() {
           </div>
         ) : (
           filtered.map((r) => (
-            <RestaurantCard key={r.id} r={r} onEdit={setEditTarget} onDelete={handleDelete} />
+            <RestaurantCard
+              key={r.id}
+              r={r}
+              onEdit={setEditTarget}
+              onDelete={handleDelete}
+              onToggleFavorite={handleToggleFavorite}
+            />
           ))
         )}
 

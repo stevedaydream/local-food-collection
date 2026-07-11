@@ -50,6 +50,7 @@ function toRow(r: SavedRestaurant, ownerId: string) {
     lng: r.lng,
     thumb: r.thumb,
     visibility: r.visibility ?? 'private',
+    favorite: r.favorite ?? false,
     created_at: r.createdAt,
   };
 }
@@ -70,6 +71,7 @@ export function fromRow(row: any): SavedRestaurant {
     thumb: row.thumb,
     createdAt: row.created_at,
     visibility: row.visibility === 'friends' ? 'friends' : 'private',
+    favorite: !!row.favorite,
   };
 }
 

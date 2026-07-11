@@ -103,6 +103,7 @@ export default function FriendsSheet({
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       visibility: 'private',
+      favorite: false,
       sourcePlatform: `朋友分享`,
     };
     onListChanged(addRestaurants([copy]));

@@ -94,6 +94,7 @@ export default function EditSheet({
       thumb: initial?.thumb ?? null,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
       visibility: shared ? 'friends' : 'private',
+      favorite: initial?.favorite ?? false,
     });
   }
 

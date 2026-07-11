@@ -16,6 +16,8 @@ export interface SavedRestaurant {
   createdAt: string;
   /** 雲端分享範圍；未設定視為 private（僅自己） */
   visibility?: 'private' | 'friends';
+  /** 我的最愛 */
+  favorite?: boolean;
 }
 
 /** AI 從截圖抽出的單一餐廳（尚未儲存） */
