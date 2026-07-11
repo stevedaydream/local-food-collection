@@ -1,5 +1,6 @@
 import type { SavedRestaurant } from './types';
 import { syncToWidget } from './widget-sync';
+import { schedulePush } from './cloud-sync';
 
 const KEY = 'food-map:restaurants:v1';
 
@@ -22,6 +23,7 @@ export function saveRestaurants(list: SavedRestaurant[]) {
     localStorage.setItem(KEY, JSON.stringify(slim));
   }
   syncToWidget(list);
+  schedulePush(list);
 }
 
 export function addRestaurants(items: SavedRestaurant[]): SavedRestaurant[] {

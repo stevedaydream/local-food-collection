@@ -20,6 +20,16 @@
 - 💾 **資料在你手上**：收藏存在裝置 localStorage，支援 JSON 匯出備份 / 匯入
 - ☁️ **Google Drive 備份（免設定）**：⚙️ 設定內一鍵備份 / 還原——備份存在使用者自己 Drive 的隱藏應用程式空間（`drive.appdata` scope，App 碰不到其他檔案）；開發者只需設定一次 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`（見 `.env.example`），使用者只要選 Google 帳號。還原採合併（依 id 去重），換新機直接還原即可。Android 殼內走原生 Google 授權（見下方 Android 章節）
 
+## 帳號與雲端同步（Supabase，Phase 1）
+
+⚙️ 設定 →「👤 帳號與雲端同步」用 Google 登入後，收藏自動同步到 Supabase（東京區）：
+
+- 登入：瀏覽器走 GIS 官方按鈕取 ID token；Android 殼走 Credential Manager 原生流程（`GoogleAuthPlugin.getIdToken`）；兩邊都用 `supabase.auth.signInWithIdToken` 換 session
+- 同步：開頁時 pull 合併（同 id 以雲端為準、「曾同步過但雲端已刪」不復活）；每次本機寫入 debounce 2 秒全量 push（upsert + 刪多餘列）；未登入/離線自動降級純 localStorage
+- Schema：`profiles` + `restaurants`（owner-only RLS；`visibility` 欄位已預留 Phase 2 朋友分享）
+- 開發者設定：`.env.example` 的 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`，並在 Supabase Dashboard → Authentication → Google provider 啟用 + 把 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 加進 Client IDs
+- Roadmap：Phase 2 邀請連結 + 朋友互看（`friendships` 表 + RLS）；Phase 3 opt-in 公共美食庫（只收客觀欄位，notes/截圖不進公共庫）
+
 ## AI 引擎（四種可選）
 
 分析引擎可透過環境變數設定，**至少設定一組**；設定多組時可在 App 內 ⚙️ 切換：
@@ -148,7 +158,9 @@ CI 簽章需在 GitHub repo → Settings → Secrets and variables → Actions �
 - [x] **真正的主畫面 widget（Android）**：Capacitor 殼 + RemoteViews widget（見上）
 - [ ] **iOS widget**：需 WidgetKit；過渡方案：iOS 可用「捷徑」App 建一個開啟 `https://你的網址/?random=1` 的捷徑放主畫面
 - [ ] **iOS 分享截圖進 App**：用「捷徑」建立分享表單捷徑，把圖片 POST 到 `/api/analyze`
-- [ ] **跨裝置同步**：接 Supabase（Auth + Postgres + Storage），取代 localStorage
+- [x] **跨裝置同步**：Supabase Auth（Google 登入）+ Postgres 同步（見「帳號與雲端同步」）
+- [ ] **朋友分享（Phase 2）**：邀請連結加好友、互看分享清單
+- [ ] **公共美食庫（Phase 3）**：opt-in 貢獻 + Google Sheet 人工審核台
 - [ ] 依目前位置排序／「附近的口袋名單」推薦
 - [ ] 已吃過 / 想吃 狀態與評分
 

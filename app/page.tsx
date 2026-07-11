@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
-import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, updateRestaurant } from '@/lib/store';
+import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, saveRestaurants, updateRestaurant } from '@/lib/store';
+import { pullAndMerge } from '@/lib/cloud-sync';
 import { syncToWidget } from '@/lib/widget-sync';
 import { takePendingSharedImage } from '@/lib/native-share';
 import { checkApkUpdate } from '@/lib/app-update';
@@ -49,6 +50,16 @@ export default function Home() {
     // Capacitor 殼內：開 App 時把名單種子同步給原生 widget、檢查 APK 是否有新版
     syncToWidget(loaded);
     checkApkUpdate();
+
+    // 已登入的話拉雲端清單合併（saveRestaurants 會順便把合併結果推回雲端）
+    pullAndMerge(loaded)
+      .then((merged) => {
+        if (merged) {
+          saveRestaurants(merged);
+          setRestaurants(merged);
+        }
+      })
+      .catch(() => {});
 
     const params = new URLSearchParams(window.location.search);
     // 主畫面捷徑「🎲 吃什麼」直接彈出隨機推薦

@@ -1,9 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { getPreferredProvider, setPreferredProvider } from '@/lib/provider-pref';
-import { exportJson, importJson } from '@/lib/store';
+import { exportJson, importJson, loadRestaurants, saveRestaurants } from '@/lib/store';
+import {
+  getAccount,
+  isAuthConfigured,
+  isInShell,
+  renderGoogleSignInButton,
+  signInShell,
+  signOut,
+  type AccountInfo,
+} from '@/lib/auth';
+import { clearSyncState, pullAndMerge } from '@/lib/cloud-sync';
 import {
   backupToDrive,
   getLastBackupTime,
@@ -33,6 +43,64 @@ export default function SettingsSheet({
   const [driveBusy, setDriveBusy] = useState<'backup' | 'restore' | null>(null);
   const [driveMsg, setDriveMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(getLastBackupTime());
+  // 帳號與雲端同步
+  const [account, setAccount] = useState<AccountInfo | null | 'loading'>('loading');
+  const [authMsg, setAuthMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  const handleSignedIn = async (acc: AccountInfo) => {
+    setAccount(acc);
+    setAuthMsg({ text: '登入成功，同步中…' });
+    try {
+      const merged = await pullAndMerge(loadRestaurants());
+      if (merged) {
+        saveRestaurants(merged);
+        onRestored(merged);
+        setAuthMsg({ text: `✅ 同步完成，目前共 ${merged.length} 家收藏` });
+      }
+    } catch (e) {
+      setAuthMsg({ text: e instanceof Error ? e.message : String(e), error: true });
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthConfigured()) {
+      setAccount(null);
+      return;
+    }
+    getAccount().then(setAccount).catch(() => setAccount(null));
+  }, []);
+
+  // 未登入且在瀏覽器：渲染 GIS 官方登入按鈕
+  useEffect(() => {
+    if (account !== null || isInShell() || !isAuthConfigured()) return;
+    const el = googleBtnRef.current;
+    if (!el) return;
+    renderGoogleSignInButton(el, handleSignedIn, (m) => setAuthMsg({ text: m, error: true })).catch(
+      (e) => setAuthMsg({ text: e instanceof Error ? e.message : String(e), error: true }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
+
+  const handleShellSignIn = async () => {
+    setAuthBusy(true);
+    setAuthMsg(null);
+    try {
+      await handleSignedIn(await signInShell());
+    } catch (e) {
+      setAuthMsg({ text: e instanceof Error ? e.message : String(e), error: true });
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    clearSyncState();
+    setAccount(null);
+    setAuthMsg({ text: '已登出，收藏仍保留在這台裝置上' });
+  };
 
   const handleBackup = async () => {
     setDriveBusy('backup');
@@ -111,7 +179,50 @@ export default function SettingsSheet({
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h2>⚙️ AI 分析引擎</h2>
+        <h2>👤 帳號與雲端同步</h2>
+        {!isAuthConfigured() ? (
+          <p className="meta" style={{ fontSize: 12.5 }}>
+            伺服器尚未設定 Supabase（NEXT_PUBLIC_SUPABASE_URL / ANON_KEY），暫時無法登入同步。
+          </p>
+        ) : account === 'loading' ? (
+          <p className="meta">
+            載入中 <span className="spinner" />
+          </p>
+        ) : account ? (
+          <>
+            <p className="meta" style={{ fontSize: 12.5 }}>
+              已登入：{account.email ?? account.userId}
+              <span style={{ display: 'block' }}>收藏會自動同步到雲端，換裝置登入即可取回。</span>
+            </p>
+            <div className="sheet-actions" style={{ marginTop: 10 }}>
+              <button className="btn secondary" onClick={handleSignOut}>
+                登出
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="meta" style={{ fontSize: 12.5 }}>
+              用 Google 登入後，收藏自動同步雲端、換裝置不遺失（也是之後朋友分享功能的基礎）。
+            </p>
+            {isInShell() ? (
+              <div className="sheet-actions" style={{ marginTop: 10 }}>
+                <button className="btn secondary" disabled={authBusy} onClick={handleShellSignIn}>
+                  {authBusy ? <span className="spinner" /> : '使用 Google 登入'}
+                </button>
+              </div>
+            ) : (
+              <div ref={googleBtnRef} style={{ marginTop: 10, minHeight: 44 }} />
+            )}
+          </>
+        )}
+        {authMsg && (
+          <p className={authMsg.error ? 'error-text' : 'meta'} style={{ fontSize: 12.5, marginTop: 8 }}>
+            {authMsg.text}
+          </p>
+        )}
+
+        <h2 style={{ marginTop: 22 }}>⚙️ AI 分析引擎</h2>
         {available === null ? (
           <p className="meta">
             載入中 <span className="spinner" />
