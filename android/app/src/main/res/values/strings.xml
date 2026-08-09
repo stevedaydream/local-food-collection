@@ -11,6 +11,17 @@
     <string name="widget_food_title">🎲 今天吃這家？</string>
     <string name="widget_food_empty">口袋名單還是空的\n打開 App 收藏幾家吧 🍜</string>
     <string name="widget_food_description">顯示一家隨機口袋餐廳，可換一家或直接導航</string>
+    <string name="widget_food_empty_region">這個區域還沒有收藏\n點右上角 📍 換個區域</string>
     <string name="widget_food_shuffle">🎲 換一家</string>
     <string name="widget_food_maps">🧭 導航</string>
+    <string name="widget_food_region_all">📍 全部</string>
+    <string name="widget_food_region">📍 %1$s</string>
+
+    <!-- Widget 區域設定 -->
+    <string name="widget_config_title">這張卡片要抽哪個區域？</string>
+    <string name="widget_config_hint">區域來自收藏的「地區（縣市）」欄位。可以放好幾張卡片，各自鎖不同區域。</string>
+    <string name="widget_config_all">全部區域</string>
+    <string name="widget_config_option">%1$s（%2$d 家）</string>
+    <string name="widget_config_ok">確定</string>
+    <string name="widget_config_cancel">取消</string>
 </resources>

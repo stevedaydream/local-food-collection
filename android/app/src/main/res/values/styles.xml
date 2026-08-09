@@ -20,6 +20,12 @@
         <item name="android:background">@drawable/splash</item>
     </style>
 
+    <!-- Widget 區域設定畫面：浮在桌面上的小對話框 -->
+    <style name="WidgetConfigTheme" parent="Theme.AppCompat.DayNight.Dialog">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
     <!-- Widget 骰子滾動的單一骰面 -->
     <style name="WidgetDiceFace">
         <item name="android:layout_width">match_parent</item>

@@ -54,11 +54,29 @@ public class MainActivity extends BridgeActivity {
         loadWithQuery("random=1");
     }
 
-    /** 其他 App 分享截圖進來：讀圖 → 暫存給 ShareReceiverPlugin → 帶參數重載頁面 */
+    /**
+     * 其他 App 分享進來：截圖 → 讀圖暫存給 ShareReceiverPlugin 走 AI 分析；
+     * 文字／連結（Google 地圖分享）→ 暫存文字，網頁端開新增表單自動解析。
+     */
     private void maybeHandleShare(Intent intent) {
         if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
         String type = intent.getType();
-        if (type == null || !type.startsWith("image/")) return;
+        if (type == null) return;
+
+        if (type.startsWith("text/")) {
+            String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+            String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+            if (text == null && subject == null) return;
+            intent.setAction(null); // 避免旋轉/重建時重複處理
+            StringBuilder sb = new StringBuilder();
+            if (subject != null && !subject.trim().isEmpty()) sb.append(subject.trim()).append('\n');
+            if (text != null) sb.append(text.trim());
+            ShareReceiverPlugin.pendingText = sb.toString();
+            loadWithQuery("share-text=1");
+            return;
+        }
+
+        if (!type.startsWith("image/")) return;
         intent.setAction(null); // 避免旋轉/重建時重複處理
         Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (uri == null) return;

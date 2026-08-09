@@ -34,6 +34,13 @@ async function currentUserId(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
+/**
+ * `google_url` 是後加的欄位。舊 Supabase 專案還沒跑 ALTER TABLE 時 upsert 會被擋，
+ * 第一次撞到就記住並改推不含這欄的資料（連結仍留在本機），同步不會整批失敗。
+ */
+let hasGoogleUrlColumn = true;
+const MISSING_COLUMN = /google_url/i;
+
 function toRow(r: SavedRestaurant, ownerId: string) {
   return {
     id: r.id,
@@ -52,6 +59,7 @@ function toRow(r: SavedRestaurant, ownerId: string) {
     visibility: r.visibility ?? 'private',
     favorite: r.favorite ?? false,
     created_at: r.createdAt,
+    ...(hasGoogleUrlColumn ? { google_url: r.googleUrl ?? null } : {}),
   };
 }
 
@@ -69,6 +77,7 @@ export function fromRow(row: any): SavedRestaurant {
     lat: row.lat,
     lng: row.lng,
     thumb: row.thumb,
+    googleUrl: row.google_url ?? null,
     createdAt: row.created_at,
     visibility: row.visibility === 'friends' ? 'friends' : 'private',
     favorite: !!row.favorite,
@@ -117,8 +126,12 @@ async function pushNow(list: SavedRestaurant[]) {
   if (!supabase || !uid) return;
 
   for (let i = 0; i < list.length; i += UPSERT_CHUNK) {
-    const chunk = list.slice(i, i + UPSERT_CHUNK).map((r) => toRow(r, uid));
-    const { error } = await supabase.from('restaurants').upsert(chunk);
+    const slice = list.slice(i, i + UPSERT_CHUNK);
+    let { error } = await supabase.from('restaurants').upsert(slice.map((r) => toRow(r, uid)));
+    if (error && hasGoogleUrlColumn && MISSING_COLUMN.test(error.message)) {
+      hasGoogleUrlColumn = false;
+      ({ error } = await supabase.from('restaurants').upsert(slice.map((r) => toRow(r, uid))));
+    }
     if (error) throw new Error(error.message);
   }
 

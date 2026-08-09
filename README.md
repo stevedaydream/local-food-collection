@@ -9,6 +9,11 @@
 - ✅ **儲存前確認**：AI 結果可先編輯、勾選要收藏哪幾家；信心較低的欄位會標示「建議核對」
 - 📋 **口袋名單**：卡片列表 + 料理類型標籤，附截圖縮圖；卡片**左滑可編輯或刪除**
 - ✏️ **手動新增**：沒有截圖也能直接輸入店名、地址等資訊收藏；店名旁「🔍 找地址」可搜尋地圖自動帶入正確地址與導航位置（設 `GOOGLE_MAPS_API_KEY` 走 Google Places，未設定退回 Nominatim）
+- 🔗 **貼上就自動填好（`/api/resolve-place`）**：新增表單最上面的欄位兩個方向都吃——
+  - **貼地址** → 找出店名、正式地址、座標與 Google 地圖連結
+  - **貼 Google 地圖連結**（含 `maps.app.goo.gl` 短網址，會先展開）→ 抓店名、地址、座標
+  - 存下來的 Google 連結會讓卡片與 widget 的「導航」直接開那家店的地圖頁（不是只掉一根座標針）
+  - Android：Google 地圖 →「分享」→ 口袋美食地圖，表單會自動解析；瀏覽器 PWA 也吃分享進來的連結（share_target 的 text/url）
 - 🗺️ 地圖檢視暫時下架（`components/MapView.tsx` 保留為接口，未來改接 Google Maps API；地理編碼 `/api/geocode` 照常運作）
 - 🎲 **吃什麼？**：2 秒全屏骰子動畫後隨機推薦，顯示店名 + 地址 + Google Maps 導航連結，並列出沒被骰到的其他候選；可按類型篩選、不滿意就「換一家」
   - **📍 附近模式**：口袋名單空空（或主動切換）時，用 GPS 定位（失敗退回台北市中心）搜尋附近餐廳來骰——設 `GOOGLE_MAPS_API_KEY` 走 Google Places Nearby（含評分），未設定退回 OSM Overpass
@@ -27,6 +32,9 @@
 - 登入：瀏覽器走 GIS 官方按鈕取 ID token；Android 殼走 Credential Manager 原生流程（`GoogleAuthPlugin.getIdToken`）；兩邊都用 `supabase.auth.signInWithIdToken` 換 session
 - 同步：開頁時 pull 合併（同 id 以雲端為準、「曾同步過但雲端已刪」不復活）；每次本機寫入 debounce 2 秒全量 push（upsert + 刪多餘列）；未登入/離線自動降級純 localStorage
 - Schema：`profiles` + `restaurants`（owner-only RLS；`visibility` 欄位已預留 Phase 2 朋友分享）
+  - 想讓「Google 地圖連結」也跨裝置同步，在 Supabase 跑一次
+    `alter table restaurants add column if not exists google_url text;`
+    沒跑也不會壞：`lib/cloud-sync.ts` 撞到缺欄位會自動改推不含這欄的資料，連結留在本機
 - 開發者設定：`.env.example` 的 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`，並在 Supabase Dashboard → Authentication → Google provider 啟用 + 把 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 加進 Client IDs
 ### 朋友分享（Phase 2）
 
@@ -102,6 +110,8 @@ npm run dev                 # http://localhost:3000
 | `app/api/providers/route.ts` | 回傳已設定的 provider 清單給設定畫面 |
 | `app/api/geocode/route.ts` | 地址 → 座標（OpenStreetMap Nominatim 代理，含快取） |
 | `app/api/place-search/route.ts` | 店名 → 地址+座標（有 `GOOGLE_MAPS_API_KEY` 走 Google Places，否則 Nominatim） |
+| `app/api/resolve-place/route.ts` | 萬用解析：貼地址 → 店名/連結、貼 Google 連結 → 店名/地址（短網址先展開，連鎖店用座標框限制範圍） |
+| `lib/place-url.ts` | 純函式：Google 地圖網址解析（店名/座標/place_id）、台灣地址推縣市、產生地圖連結 |
 | `app/api/nearby/route.ts` | 座標 → 附近餐廳清單（Google Places Nearby / OSM Overpass） |
 | `components/RandomSheet.tsx` | 隨機推薦：口袋/附近雙來源 + 骰子動畫 + 遺珠清單 |
 | `components/DiceRoll.tsx` | 全屏 2 秒骰子滾動動畫 |
@@ -111,7 +121,7 @@ npm run dev                 # http://localhost:3000
 | `lib/native-share.ts` | 殼內接收原生分享的截圖（ShareReceiverPlugin → Blob） |
 | `components/AnalyzeSheet.tsx` | 分析中 → 確認編輯 → 儲存 的流程 |
 | `components/RandomSheet.tsx` | 隨機推薦（可依料理類型篩選） |
-| `components/EditSheet.tsx` | 手動新增 / 編輯收藏（共用表單，地址變更會重新地理編碼） |
+| `components/EditSheet.tsx` | 手動新增 / 編輯收藏（共用表單，最上面可貼地址或 Google 連結自動填入，地址變更會重新地理編碼） |
 | `components/MapView.tsx` | 地圖接口（暫未掛載，未來改 Google Maps API 時替換內部實作） |
 | `public/sw.js` | Service worker：PWA 安裝 + 接收分享的截圖 |
 | `public/manifest.webmanifest` | PWA 設定：主畫面捷徑、share_target |
@@ -126,13 +136,27 @@ Capacitor 殼，WebView 直接載入 `https://local-food-collection.vercel.app`�
 - **🎲 吃什麼（1×1 按鈕）**：`DiceWidgetProvider`，點了開 App 並直接彈出隨機推薦（`?random=1`）
 - **隨機餐廳卡片（4×2）**：`RandomFoodWidgetProvider`，直接顯示一家口袋餐廳，可「換一家」、開 Google Maps 導航、點卡片開 App
 
+#### widget 選區域
+
+卡片右上角的 **📍 標籤**（或新增 widget 時 launcher 跳出的設定畫面）可以選這張卡片只抽哪個縣市——
+所以可以並排放「台北」「台中」兩張卡片各自骰。實作：
+
+- `WidgetConfigActivity`：`widget_random_food_info.xml` 的 `android:configure`，選項是名單裡出現過的 `city` +「全部區域」，各項附家數
+- `widget_random_food_info.xml` 帶 `widgetFeatures="reconfigurable|configuration_optional"`：Android 12+ 新增時不強迫設定（預設全部），之後隨時點 📍 改
+- `WidgetData`：區域與「目前抽到哪一家」都存成 per `appWidgetId`（`region_<id>` / `current_restaurant_id_<id>`），widget 移除時 `onDeleted` 清掉；每張卡片的 PendingIntent request code 也依 id 分開，換一家只動被點的那張
+- 該區域沒有收藏時卡片顯示「這個區域還沒有收藏」，📍 仍可點回別區
+
 資料流：`lib/store.ts` 每次寫入（+ App 開啟時）→ `lib/widget-sync.ts` 呼叫原生 `WidgetSyncPlugin` → SharedPreferences → widget 重繪。widget 資料來源是**殼內 WebView 的 localStorage**，與 Chrome/PWA 的收藏是分開的（可用 Google Drive 備份/還原或 JSON 匯出/匯入互通）。
 
-### 殼內接收分享截圖（原生 ACTION_SEND）
+### 殼內接收分享的截圖與連結（原生 ACTION_SEND）
 
 PWA 的 Web Share Target 只對 Chrome 安裝的 PWA 生效；殼 App 另外用原生 intent-filter 接收：
-任何 App 截圖 → 分享 → 選「口袋美食地圖」→ `MainActivity` 讀圖存進 `ShareReceiverPlugin` →
-WebView 載入 `/?share-native=1` → 網頁端（`lib/native-share.ts`）取圖直接進 AI 分析流程。
+
+- **`image/*`**：任何 App 截圖 → 分享 → 選「口袋美食地圖」→ `MainActivity` 讀圖存進 `ShareReceiverPlugin` →
+  WebView 載入 `/?share-native=1` → 網頁端（`lib/native-share.ts`）取圖直接進 AI 分析流程
+- **`text/plain`**：Google 地圖 → 分享 → 口袋美食地圖 → 文字存進 `ShareReceiverPlugin.pendingText` →
+  `/?share-text=1` → 開新增表單自動呼叫 `/api/resolve-place` 解析（瀏覽器 PWA 走 `public/sw.js`
+  把分享的文字暫存到 cache，同樣導到 `/?share-text=1`）
 
 ### 殼內 Google Drive 備份（原生授權）
 

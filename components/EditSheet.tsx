@@ -1,15 +1,21 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 
 export default function EditSheet({
   initial,
+  initialPaste = '',
+  autoResolve = false,
   onSave,
   onClose,
 }: {
   /** 有值＝編輯既有收藏；null＝手動新增 */
   initial: SavedRestaurant | null;
+  /** 預先填進「貼上」欄位的內容（分享進來的文字、剪貼簿） */
+  initialPaste?: string;
+  /** 開啟時就自動解析 initialPaste（從分享選單進來時用） */
+  autoResolve?: boolean;
   onSave: (item: SavedRestaurant) => void;
   onClose: () => void;
 }) {
@@ -20,33 +26,64 @@ export default function EditSheet({
   const [priceRange, setPriceRange] = useState(initial?.priceRange ?? '');
   const [dishes, setDishes] = useState(initial?.dishes.join('、') ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [googleUrl, setGoogleUrl] = useState(initial?.googleUrl ?? '');
   const [shared, setShared] = useState(initial?.visibility === 'friends');
   const [saving, setSaving] = useState(false);
+  const [paste, setPaste] = useState(initialPaste);
   const [looking, setLooking] = useState(false);
   const [lookupMsg, setLookupMsg] = useState('');
   // 搜尋帶入的座標；儲存時若地址沒再被改過就直接沿用，不必重查
   const found = useRef<{ address: string; lat: number | null; lng: number | null } | null>(null);
 
-  async function handleLookup() {
-    if (!name.trim() || looking) return;
+  /**
+   * 萬用解析：q 可以是地址、店名，或 Google 地圖連結（含分享出來的短網址），
+   * 查得到就把店名／地址／地區／連結一起補進表單。
+   */
+  async function resolve(q: string) {
+    if (!q.trim() || looking) return;
     setLooking(true);
     setLookupMsg('');
     try {
-      const q = [name.trim(), address.trim()].filter(Boolean).join(' ');
-      const res = await fetch(`/api/place-search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/resolve-place?q=${encodeURIComponent(q.trim())}`);
       const p = await res.json();
+      if (!p.name && !p.address) {
+        setLookupMsg(p.message ?? '查不到這家店，補上縣市或路名再試一次');
+        setLooking(false);
+        return;
+      }
+      const filled: string[] = [];
+      if (p.name) {
+        setName(p.name);
+        filled.push(`店名「${p.name}」`);
+      }
       if (p.address) {
         setAddress(p.address);
         found.current = { address: p.address, lat: p.lat ?? null, lng: p.lng ?? null };
-        setLookupMsg('✅ 已帶入地址，儲存後導航會用這個位置');
-      } else {
-        setLookupMsg('找不到這家店，試試在店名或地址加上城市／路名再搜一次');
+        filled.push('地址');
       }
+      if (p.city && !city.trim()) setCity(p.city);
+      if (p.cuisine && !cuisine.trim()) setCuisine(p.cuisine);
+      if (p.googleUrl) {
+        setGoogleUrl(p.googleUrl);
+        filled.push('Google 地圖連結');
+      }
+      setLookupMsg(
+        `✅ 已帶入${filled.join('、')}；請核對後儲存` + (p.message ? `\n⚠️ ${p.message}` : ''),
+      );
     } catch {
       setLookupMsg('連線失敗，請確認網路後再試');
     }
     setLooking(false);
   }
+
+  // 從分享選單帶文字進來：直接開始解析，使用者只要確認
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!autoResolve || autoRan.current || !initialPaste.trim()) return;
+    autoRan.current = true;
+    resolve(initialPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoResolve, initialPaste]);
 
   async function handleSave() {
     if (!name.trim() || saving) return;
@@ -87,11 +124,16 @@ export default function EditSheet({
         .map((s) => s.trim())
         .filter(Boolean),
       priceRange: priceRange.trim() || null,
-      sourcePlatform: initial ? initial.sourcePlatform : '手動輸入',
+      sourcePlatform: initial
+        ? initial.sourcePlatform
+        : /https?:\/\//.test(paste)
+          ? 'Google 地圖'
+          : '手動輸入',
       notes: notes.trim() || null,
       lat,
       lng,
       thumb: initial?.thumb ?? null,
+      googleUrl: googleUrl.trim() || null,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
       visibility: shared ? 'friends' : 'private',
       favorite: initial?.favorite ?? false,
@@ -101,14 +143,40 @@ export default function EditSheet({
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h2>{initial ? '✏️ 編輯收藏' : '✏️ 手動新增餐廳'}</h2>
+        <h2>{initial ? '✏️ 編輯收藏' : '✏️ 新增餐廳'}</h2>
+
+        <div className="paste-box">
+          <label>✨ 貼上地址或 Google 地圖連結，自動填好</label>
+          <div className="field-row">
+            <input
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') resolve(paste);
+              }}
+              placeholder="台北市…路 100 號 ／ https://maps.app.goo.gl/…"
+            />
+            <button
+              className="mini-btn"
+              onClick={() => resolve(paste)}
+              disabled={looking || !paste.trim()}
+              title="貼地址自動抓店名與 Google 連結；貼 Google 連結自動抓店名與地址"
+            >
+              {looking ? <span className="spinner" style={{ width: 14, height: 14 }} /> : '✨ 自動填入'}
+            </button>
+          </div>
+          <p className="lookup-msg">
+            在 Google 地圖按「分享」複製的連結也可以直接貼；殼 App 還能從分享選單直接傳進來。
+          </p>
+        </div>
+
         <div className="field">
           <label>店名（必填）</label>
           <div className="field-row">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：阿宏麵線" />
             <button
               className="mini-btn"
-              onClick={handleLookup}
+              onClick={() => resolve([name.trim(), address.trim()].filter(Boolean).join(' '))}
               disabled={looking || !name.trim()}
               title="用店名搜尋地圖，自動帶入地址與導航位置"
             >
@@ -124,6 +192,27 @@ export default function EditSheet({
             placeholder="有地址才能導航與定位"
           />
           {lookupMsg && <p className="lookup-msg">{lookupMsg}</p>}
+        </div>
+        <div className="field">
+          <label>Google 地圖連結</label>
+          <div className="field-row">
+            <input
+              value={googleUrl}
+              onChange={(e) => setGoogleUrl(e.target.value)}
+              placeholder="有連結的話「導航」會直接開這家店的地圖頁"
+            />
+            {googleUrl.trim() && (
+              <a
+                className="mini-btn"
+                href={googleUrl.trim()}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+              >
+                🔗 開啟
+              </a>
+            )}
+          </div>
         </div>
         <div className="field">
           <label>地區（縣市）</label>

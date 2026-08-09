@@ -6,6 +6,8 @@
     android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
+    android:configure="com.stevedaydream.localfood.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
     android:initialLayout="@layout/widget_random_food"
     android:previewLayout="@layout/widget_random_food"
     android:description="@string/widget_food_description"

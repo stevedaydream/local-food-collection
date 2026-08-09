@@ -29,6 +29,26 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
 
+            <!-- 接收分享進來的文字／連結（Google 地圖 → 分享 → 美食地圖） -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+        </activity>
+
+        <!-- 餐廳卡片 widget 的區域設定（新增 widget 時 / 點卡片右上角 📍 時開啟） -->
+        <activity
+            android:name=".WidgetConfigActivity"
+            android:label="@string/widget_config_title"
+            android:theme="@style/WidgetConfigTheme"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
         </activity>
 
         <!-- 按鈕型 widget：🎲 吃什麼 -->

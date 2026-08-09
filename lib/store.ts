@@ -58,8 +58,14 @@ export function importJson(json: string): SavedRestaurant[] {
   return merged;
 }
 
-/** Google Maps 導航連結 — 有座標用座標，否則用店名+地址搜尋 */
-export function mapsUrl(r: Pick<SavedRestaurant, 'name' | 'address' | 'lat' | 'lng'>): string {
+/**
+ * Google Maps 連結 — 存過店家連結（貼連結/自動查詢帶入）就用它，會直接開店家頁；
+ * 否則有座標用座標，最後退回店名+地址搜尋。
+ */
+export function mapsUrl(
+  r: Pick<SavedRestaurant, 'name' | 'address' | 'lat' | 'lng'> & { googleUrl?: string | null },
+): string {
+  if (r.googleUrl) return r.googleUrl;
   if (r.lat != null && r.lng != null) {
     return `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
   }

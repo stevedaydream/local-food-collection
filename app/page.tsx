@@ -5,7 +5,7 @@ import type { SavedRestaurant } from '@/lib/types';
 import { addRestaurants, exportJson, importJson, loadRestaurants, removeRestaurant, saveRestaurants, updateRestaurant } from '@/lib/store';
 import { pullAndMerge } from '@/lib/cloud-sync';
 import { syncToWidget } from '@/lib/widget-sync';
-import { takePendingSharedImage } from '@/lib/native-share';
+import { takePendingSharedImage, takePendingSharedText } from '@/lib/native-share';
 import { checkApkUpdate } from '@/lib/app-update';
 import RestaurantCard from '@/components/RestaurantCard';
 import AnalyzeSheet from '@/components/AnalyzeSheet';
@@ -25,6 +25,11 @@ export default function Home() {
   const [showFriends, setShowFriends] = useState(false);
   /** EditSheet 狀態：null=關閉、'new'=手動新增、物件=編輯該筆 */
   const [editTarget, setEditTarget] = useState<SavedRestaurant | 'new' | null>(null);
+  /** 開 EditSheet 時預填進「貼上」欄位的內容，autoResolve=從分享進來要直接解析 */
+  const [pasteSeed, setPasteSeed] = useState<{ text: string; autoResolve: boolean }>({
+    text: '',
+    autoResolve: false,
+  });
   // 條件篩選（空字串 = 不篩）
   const [fSource, setFSource] = useState('');
   const [fCity, setFCity] = useState('');
@@ -92,6 +97,29 @@ export default function Home() {
       });
     }
 
+    // 分享文字/連結進來（Google 地圖 → 分享 → 美食地圖）：開表單自動解析
+    // 殼 App 走原生 plugin，瀏覽器 PWA 走 service worker 暫存的 cache
+    if (params.get('share-text') === '1') {
+      (async () => {
+        let text = await takePendingSharedText();
+        if (!text) {
+          try {
+            const cache = await caches.open('shared-images');
+            const res = await cache.match('/shared-text');
+            if (res) {
+              text = (await res.text()).trim();
+              await cache.delete('/shared-text');
+            }
+          } catch {
+            /* 不支援 cache API 就略過 */
+          }
+        }
+        if (!text) return;
+        setPasteSeed({ text, autoResolve: true });
+        setEditTarget('new');
+      })();
+    }
+
     // Android 分享截圖進來（Web Share Target）：service worker 把圖放進 cache
     if (params.get('share-target') === '1') {
       (async () => {
@@ -126,6 +154,18 @@ export default function Home() {
 
   const handleToggleFavorite = (r: SavedRestaurant) => {
     setRestaurants(updateRestaurant({ ...r, favorite: !r.favorite }));
+  };
+
+  /** 「🔗 貼連結」：能讀剪貼簿就先填好（讀不到就開空欄位讓使用者自己貼） */
+  const handleOpenPaste = async () => {
+    let text = '';
+    try {
+      text = (await navigator.clipboard.readText()).trim().slice(0, 600);
+    } catch {
+      /* 沒授權或不支援剪貼簿讀取：留空 */
+    }
+    setPasteSeed({ text, autoResolve: false });
+    setEditTarget('new');
   };
 
   const handleExport = () => {
@@ -219,9 +259,11 @@ export default function Home() {
             <span className="emoji">📸</span>
             在 IG、Threads、小紅書看到好吃的？
             <br />
-            截圖後按下方「截圖新增」，AI 幫你自動歸檔。
+            截圖後按下方「📸 截圖」，AI 幫你自動歸檔。
             <br />
-            安裝到主畫面後，也可以直接把截圖「分享」進來。
+            或按「🔗 貼連結」貼 Google 地圖連結／地址，店名與位置自動補齊。
+            <br />
+            安裝到主畫面後，截圖和地圖連結都能直接「分享」進來。
           </div>
         ) : filtered.length === 0 ? (
           <div className="empty">
@@ -250,9 +292,18 @@ export default function Home() {
 
       <div className="bottom-bar">
         <button className="btn secondary" onClick={() => fileInput.current?.click()}>
-          📸 截圖新增
+          📸 截圖
         </button>
-        <button className="btn secondary" onClick={() => setEditTarget('new')}>
+        <button className="btn secondary" onClick={handleOpenPaste}>
+          🔗 貼連結
+        </button>
+        <button
+          className="btn secondary"
+          onClick={() => {
+            setPasteSeed({ text: '', autoResolve: false });
+            setEditTarget('new');
+          }}
+        >
           ✏️ 手動
         </button>
         <button className="btn primary" onClick={() => setShowRandom(true)}>
@@ -290,6 +341,8 @@ export default function Home() {
       {editTarget && (
         <EditSheet
           initial={editTarget === 'new' ? null : editTarget}
+          initialPaste={editTarget === 'new' ? pasteSeed.text : ''}
+          autoResolve={editTarget === 'new' && pasteSeed.autoResolve}
           onSave={handleEditSave}
           onClose={() => setEditTarget(null)}
         />
