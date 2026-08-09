@@ -3,7 +3,14 @@ export interface SavedRestaurant {
   id: string;
   name: string;
   address: string | null;
+  /** 一級行政區：台北市 / 東京都 */
   city: string | null;
+  /** 二級行政區：信義區 / 荒川區（後加欄位，舊資料為 undefined） */
+  district?: string | null;
+  /** 國家顯示名：台灣 / 日本 */
+  country?: string | null;
+  /** 國家代碼：TW / JP。推薦時的國家硬篩用；沒有時由座標經 countryOf() 推算 */
+  countryCode?: string | null;
   cuisine: string | null;
   dishes: string[];
   priceRange: string | null;

@@ -35,11 +35,12 @@ async function currentUserId(): Promise<string | null> {
 }
 
 /**
- * `google_url` 是後加的欄位。舊 Supabase 專案還沒跑 ALTER TABLE 時 upsert 會被擋，
- * 第一次撞到就記住並改推不含這欄的資料（連結仍留在本機），同步不會整批失敗。
+ * `google_url` / `district` / `country` / `country_code` 都是後加的欄位。
+ * 舊 Supabase 專案還沒跑 ALTER TABLE 時 upsert 會被擋，第一次撞到就記住並改推
+ * 不含這些欄的資料（值仍留在本機），同步不會整批失敗。
  */
-let hasGoogleUrlColumn = true;
-const MISSING_COLUMN = /google_url/i;
+let hasNewColumns = true;
+const MISSING_COLUMN = /google_url|district|country/i;
 
 function toRow(r: SavedRestaurant, ownerId: string) {
   return {
@@ -59,7 +60,14 @@ function toRow(r: SavedRestaurant, ownerId: string) {
     visibility: r.visibility ?? 'private',
     favorite: r.favorite ?? false,
     created_at: r.createdAt,
-    ...(hasGoogleUrlColumn ? { google_url: r.googleUrl ?? null } : {}),
+    ...(hasNewColumns
+      ? {
+          google_url: r.googleUrl ?? null,
+          district: r.district ?? null,
+          country: r.country ?? null,
+          country_code: r.countryCode ?? null,
+        }
+      : {}),
   };
 }
 
@@ -69,6 +77,9 @@ export function fromRow(row: any): SavedRestaurant {
     name: row.name,
     address: row.address,
     city: row.city,
+    district: row.district ?? null,
+    country: row.country ?? null,
+    countryCode: row.country_code ?? null,
     cuisine: row.cuisine,
     dishes: Array.isArray(row.dishes) ? row.dishes : [],
     priceRange: row.price_range,
@@ -128,8 +139,8 @@ async function pushNow(list: SavedRestaurant[]) {
   for (let i = 0; i < list.length; i += UPSERT_CHUNK) {
     const slice = list.slice(i, i + UPSERT_CHUNK);
     let { error } = await supabase.from('restaurants').upsert(slice.map((r) => toRow(r, uid)));
-    if (error && hasGoogleUrlColumn && MISSING_COLUMN.test(error.message)) {
-      hasGoogleUrlColumn = false;
+    if (error && hasNewColumns && MISSING_COLUMN.test(error.message)) {
+      hasNewColumns = false;
       ({ error } = await supabase.from('restaurants').upsert(slice.map((r) => toRow(r, uid))));
     }
     if (error) throw new Error(error.message);

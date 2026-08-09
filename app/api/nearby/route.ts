@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NearbyPlace } from '@/lib/types';
 
-export const maxDuration = 15;
+export const maxDuration = 25;
 
 const RADIUS_DEFAULT = 1500; // 公尺
+/**
+ * Overpass 的半徑上限。密集市區（東京）用 1500m 查詢實測要 12 秒以上，
+ * 收斂到 800m（約 10 分鐘腳程）回應是 1～2 秒，對「現在吃哪家」也夠用。
+ */
+const RADIUS_OSM_MAX = 800;
 
 /**
  * 座標 → 附近餐廳清單（隨機推薦「附近」模式用）。
@@ -61,10 +66,17 @@ export async function GET(req: Request) {
     }
 
     // Overpass：找附近有名字的餐廳/小吃/咖啡
-    const query = `[out:json][timeout:10];node["amenity"~"^(restaurant|fast_food|cafe)$"]["name"](around:${radius},${lat},${lng});out body 40;`;
+    // 一定要同時帶 User-Agent 與 Accept，否則 Overpass 會回 406 Not Acceptable
+    // （Node 的 fetch 預設兩個都沒有，導致這條退路以前永遠回空清單）
+    const osmRadius = Math.min(radius, RADIUS_OSM_MAX);
+    const query = `[out:json][timeout:10];node["amenity"~"^(restaurant|fast_food|cafe)$"]["name"](around:${osmRadius},${lat},${lng});out body 40;`;
     const res = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        'User-Agent': 'local-food-collection/0.1 (personal food map app)',
+      },
       body: `data=${encodeURIComponent(query)}`,
     });
     if (!res.ok) return NextResponse.json({ places: [], source: 'osm' });

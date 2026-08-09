@@ -65,12 +65,27 @@ public class WidgetConfigActivity extends AppCompatActivity {
         values.clear();
         group.removeAllViews();
 
+        addFollowOption();
         addOption(WidgetData.REGION_ALL, getString(R.string.widget_config_all));
         for (String region : regions) addOption(region, region);
 
         int index = Math.max(0, values.indexOf(selected));
         View checked = group.getChildAt(index);
         if (checked instanceof RadioButton) ((RadioButton) checked).setChecked(true);
+    }
+
+    /** 「📍 跟著我的位置」：說明文字依有沒有收到過定位而不同 */
+    private void addFollowOption() {
+        String label = WidgetData.hasLocation(this)
+                ? getString(R.string.widget_config_follow_at, WidgetData.followLabel(this))
+                : getString(R.string.widget_config_follow_empty);
+        RadioButton button = new RadioButton(this);
+        button.setId(View.generateViewId());
+        button.setText(label);
+        button.setTextSize(15f);
+        button.setPadding(button.getPaddingLeft(), 14, button.getPaddingRight(), 14);
+        group.addView(button);
+        values.add(WidgetData.REGION_FOLLOW);
     }
 
     private void addOption(String value, String label) {

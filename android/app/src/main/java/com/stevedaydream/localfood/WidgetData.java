@@ -22,6 +22,8 @@ public final class WidgetData {
 
     private static final String PREFS = "widget_data";
     private static final String KEY_JSON = "restaurants_json";
+    /** App 每次成功定位時推過來的位置（widget 自己抓 GPS 要背景定位權限，所以由 App 餵） */
+    private static final String KEY_LOCATION = "location_json";
     /** 舊版（未分區）全域「目前這家」；升級後第一次讀還沿用，之後改存 per-widget */
     private static final String KEY_LEGACY_CURRENT_ID = "current_restaurant_id";
     private static final String PREFIX_CURRENT_ID = "current_restaurant_id_";
@@ -29,6 +31,11 @@ public final class WidgetData {
 
     /** 不限區域 */
     public static final String REGION_ALL = "";
+    /**
+     * 跟著 App 最後一次定位的位置：先試「目前的一級行政區」，
+     * 那一級沒有收藏就放寬到「同國家」（見 inRegion）。
+     */
+    public static final String REGION_FOLLOW = "follow";
 
     private WidgetData() {}
 
@@ -38,6 +45,27 @@ public final class WidgetData {
 
     public static void saveJson(Context context, String json) {
         prefs(context).edit().putString(KEY_JSON, json).apply();
+    }
+
+    /** Web 端（lib/widget-sync.ts）推來的目前位置；沒有就回 null */
+    public static void saveLocation(Context context, String json) {
+        prefs(context).edit().putString(KEY_LOCATION, json).apply();
+    }
+
+    public static JSONObject getLocation(Context context) {
+        String raw = prefs(context).getString(KEY_LOCATION, null);
+        if (raw == null) return null;
+        try {
+            return new JSONObject(raw);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String locField(Context context, String key) {
+        JSONObject loc = getLocation(context);
+        if (loc == null || loc.isNull(key)) return "";
+        return loc.optString(key, "").trim();
     }
 
     public static JSONArray getRestaurants(Context context) {
@@ -88,16 +116,60 @@ public final class WidgetData {
         return r.optString("city", "").trim();
     }
 
-    /** 指定區域內的餐廳（區域為空＝全部） */
+    /**
+     * 指定區域內的餐廳。
+     * - 區域為空 → 全部
+     * - REGION_FOLLOW → 目前一級行政區的收藏；那一級沒有就放寬到同國家
+     * - 其他 → 該一級行政區（city 欄位）
+     */
     public static List<JSONObject> inRegion(Context context, String region) {
+        if (REGION_FOLLOW.equals(region)) {
+            List<JSONObject> byCity = matching(context, city(context, null), null);
+            if (!byCity.isEmpty()) return byCity;
+            return matching(context, null, locField(context, "countryCode"));
+        }
+        return matching(context, region, null);
+    }
+
+    /** city 有值就比一級行政區，countryCode 有值就比國家；兩者都空＝全部 */
+    private static List<JSONObject> matching(Context context, String city, String countryCode) {
         JSONArray list = getRestaurants(context);
         List<JSONObject> out = new ArrayList<>();
+        boolean byCity = city != null && !city.isEmpty();
+        boolean byCountry = countryCode != null && !countryCode.isEmpty();
         for (int i = 0; i < list.length(); i++) {
             JSONObject r = list.optJSONObject(i);
             if (r == null) continue;
-            if (region == null || region.isEmpty() || region.equals(city(r))) out.add(r);
+            if (byCity && !city.equals(city(r))) continue;
+            if (byCountry && !countryCode.equalsIgnoreCase(str(r, "countryCode"))) continue;
+            out.add(r);
         }
         return out;
+    }
+
+    /** 目前位置的一級行政區（給 REGION_FOLLOW 用）；fallback 為呼叫端傳入的預設 */
+    private static String city(Context context, String fallback) {
+        String city = locField(context, "city");
+        return city.isEmpty() ? (fallback == null ? "" : fallback) : city;
+    }
+
+    private static String str(JSONObject r, String key) {
+        if (r == null || r.isNull(key)) return "";
+        return r.optString(key, "").trim();
+    }
+
+    /** widget 上「📍 …」要顯示什麼：跟著位置時顯示實際跟到的層級 */
+    public static String followLabel(Context context) {
+        String city = locField(context, "city");
+        if (!city.isEmpty() && !matching(context, city, null).isEmpty()) return city;
+        String country = locField(context, "country");
+        if (!country.isEmpty()) return country;
+        return "";
+    }
+
+    /** 有沒有收到過位置（沒有的話「跟著我的位置」要提示先開 App 定位） */
+    public static boolean hasLocation(Context context) {
+        return getLocation(context) != null;
     }
 
     public static int countInRegion(Context context, String region) {

@@ -114,6 +114,23 @@ export function guessCity(address: string | null | undefined): string | null {
   return null;
 }
 
+/**
+ * 行政區名稱正規化，統一寫入資料前呼叫，避免同一個地區在篩選選單裡裂成兩項：
+ * - Nominatim 有時回「冲绳县 / 沖繩縣」這種簡繁併排 → 取後面的繁體
+ * - 臺 → 台（與使用者手動輸入的習慣一致）
+ * - 日文行政區後綴轉繁體：区 → 區、県 → 縣（地名主體保留原文，例如「渋谷」不動）
+ */
+export function normalizeRegion(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const picked = name.includes(' / ') ? name.split(' / ').pop()! : name;
+  const out = picked
+    .trim()
+    .replace(/臺/g, '台')
+    .replace(/区/g, '區')
+    .replace(/県/g, '縣');
+  return out || null;
+}
+
 /** 產生 Google 地圖連結；有 place_id 就鎖定那家店（會開店家頁而不是只掉一根座標針） */
 export function buildGoogleUrl(p: {
   name?: string | null;

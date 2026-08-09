@@ -3,17 +3,21 @@
 import { useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { mapsUrl } from '@/lib/store';
+import { formatDistance } from '@/lib/country-bbox';
 
 /** 左滑後露出的動作區寬度 (px) */
 const ACTIONS_WIDTH = 132;
 
 export default function RestaurantCard({
   r,
+  km,
   onEdit,
   onDelete,
   onToggleFavorite,
 }: {
   r: SavedRestaurant;
+  /** 離目前位置多遠（開「📍 這附近」時才傳） */
+  km?: number | null;
   onEdit: (r: SavedRestaurant) => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (r: SavedRestaurant) => void;
@@ -116,6 +120,7 @@ export default function RestaurantCard({
             {r.notes ? <div>📝 {r.notes}</div> : null}
           </div>
           <div className="chips">
+            {km != null && <span className="chip accent">📍 {formatDistance(km)}</span>}
             {r.visibility === 'friends' && <span className="chip">👥 已分享</span>}
             {r.cuisine && <span className="chip accent">{r.cuisine}</span>}
             {r.priceRange && <span className="chip">{r.priceRange}</span>}

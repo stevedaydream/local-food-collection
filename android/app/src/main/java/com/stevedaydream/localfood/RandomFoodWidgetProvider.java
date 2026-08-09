@@ -98,9 +98,7 @@ public class RandomFoodWidgetProvider extends AppWidgetProvider {
         views.setViewVisibility(R.id.widget_food_main, View.VISIBLE);
 
         String region = WidgetData.getRegion(context, appWidgetId);
-        views.setTextViewText(R.id.widget_food_region, region.isEmpty()
-                ? context.getString(R.string.widget_food_region_all)
-                : context.getString(R.string.widget_food_region, region));
+        views.setTextViewText(R.id.widget_food_region, regionLabel(context, region));
 
         // 點卡片本體 → 開 App
         Intent open = new Intent(context, MainActivity.class);
@@ -157,6 +155,19 @@ public class RandomFoodWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
 
         return views;
+    }
+
+    /** 右上角 📍 標籤：跟著位置時顯示實際跟到的層級並標「自動」 */
+    private static String regionLabel(Context context, String region) {
+        if (WidgetData.REGION_FOLLOW.equals(region)) {
+            String followed = WidgetData.followLabel(context);
+            return followed.isEmpty()
+                    ? context.getString(R.string.widget_food_region_follow_empty)
+                    : context.getString(R.string.widget_food_region_follow, followed);
+        }
+        return region.isEmpty()
+                ? context.getString(R.string.widget_food_region_all)
+                : context.getString(R.string.widget_food_region, region);
     }
 
     /** 「料理類型 · 城市 · 推薦菜」一行摘要；已用區域篩過就不重複顯示城市 */

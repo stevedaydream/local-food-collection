@@ -186,6 +186,57 @@ export default function SettingsSheet({
     }
   };
 
+  // 補齊地區資料（縣市 / 行政區 / 國家）
+  const [geoBusy, setGeoBusy] = useState('');
+  const [geoMsg, setGeoMsg] = useState<{ text: string; error?: boolean } | null>(null);
+
+  /**
+   * 把有座標但缺 district / countryCode 的舊收藏反查補齊。
+   * Nominatim 政策是 1 req/s，所以每筆間隔 1.1 秒慢慢跑，並顯示進度。
+   */
+  const handleBackfillRegions = async () => {
+    const all = loadRestaurants();
+    const targets = all.filter(
+      (r) => r.lat != null && r.lng != null && (!r.district || !r.countryCode),
+    );
+    if (!targets.length) {
+      setGeoMsg({ text: '所有有座標的收藏都已經有地區資料了。' });
+      return;
+    }
+    setGeoMsg(null);
+    const byId = new Map(all.map((r) => [r.id, r]));
+    let done = 0;
+    for (const r of targets) {
+      setGeoBusy(`補齊中… ${++done}/${targets.length}`);
+      try {
+        const res = await fetch(`/api/reverse-geocode?lat=${r.lat}&lng=${r.lng}`);
+        const g = (await res.json()) as {
+          country: string | null;
+          countryCode: string | null;
+          city: string | null;
+          district: string | null;
+        };
+        if (g.countryCode || g.city || g.district) {
+          byId.set(r.id, {
+            ...r,
+            city: g.city ?? r.city,
+            district: g.district ?? r.district ?? null,
+            country: g.country ?? r.country ?? null,
+            countryCode: g.countryCode ?? r.countryCode ?? null,
+          });
+        }
+      } catch {
+        /* 單筆失敗略過，下次再補 */
+      }
+      if (done < targets.length) await new Promise((resolve) => setTimeout(resolve, 1100));
+    }
+    const merged = all.map((r) => byId.get(r.id) ?? r);
+    saveRestaurants(merged);
+    onRestored(merged);
+    setGeoBusy('');
+    setGeoMsg({ text: `已補齊 ${targets.length} 筆的縣市 / 行政區 / 國家。` });
+  };
+
   const [showLocalSetup, setShowLocalSetup] = useState(false);
   const [localConfigured, setLocalConfigured] = useState(false);
 
@@ -324,6 +375,28 @@ export default function SettingsSheet({
             )}
           </>
         )}
+        <h2 style={{ marginTop: 22 }}>📍 地區資料</h2>
+        <p className="meta" style={{ fontSize: 12.5 }}>
+          「🎲 吃什麼」會只推薦你目前所在國家的店，靠的是每筆收藏的縣市 / 行政區 / 國家。
+          舊收藏只有座標、沒有這些欄位，可以按下面補齊（每秒一筆，會跑一下）。
+        </p>
+        <div className="sheet-actions" style={{ marginTop: 10 }}>
+          <button className="btn secondary" disabled={!!geoBusy} onClick={handleBackfillRegions}>
+            {geoBusy ? (
+              <>
+                <span className="spinner" /> {geoBusy}
+              </>
+            ) : (
+              '📍 補齊地區資料'
+            )}
+          </button>
+        </div>
+        {geoMsg && (
+          <p className={geoMsg.error ? 'error-text' : 'meta'} style={{ fontSize: 12.5, marginTop: 8 }}>
+            {geoMsg.text}
+          </p>
+        )}
+
         {account && account !== 'loading' && (
           <>
             <h2 style={{ marginTop: 22 }}>🌍 公共美食庫</h2>

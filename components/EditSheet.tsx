@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
+import { countryOf } from '@/lib/country-bbox';
 
 export default function EditSheet({
   initial,
@@ -22,6 +23,12 @@ export default function EditSheet({
   const [name, setName] = useState(initial?.name ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [city, setCity] = useState(initial?.city ?? '');
+  const [district, setDistrict] = useState(initial?.district ?? '');
+  // 反查帶回來的國家（推薦的國家硬篩要用）；沒查到就在儲存時用座標推
+  const region = useRef<{ country: string | null; countryCode: string | null }>({
+    country: initial?.country ?? null,
+    countryCode: initial?.countryCode ?? null,
+  });
   const [cuisine, setCuisine] = useState(initial?.cuisine ?? '');
   const [priceRange, setPriceRange] = useState(initial?.priceRange ?? '');
   const [dishes, setDishes] = useState(initial?.dishes.join('、') ?? '');
@@ -61,7 +68,10 @@ export default function EditSheet({
         found.current = { address: p.address, lat: p.lat ?? null, lng: p.lng ?? null };
         filled.push('地址');
       }
-      if (p.city && !city.trim()) setCity(p.city);
+      // 地區以反查到的正式行政區為準（篩選與 widget 選區域都靠它，格式要統一）
+      if (p.city) setCity(p.city);
+      if (p.district) setDistrict(p.district);
+      if (p.countryCode) region.current = { country: p.country ?? null, countryCode: p.countryCode };
       if (p.cuisine && !cuisine.trim()) setCuisine(p.cuisine);
       if (p.googleUrl) {
         setGoogleUrl(p.googleUrl);
@@ -99,25 +109,38 @@ export default function EditSheet({
       lat = found.current.lat;
       lng = found.current.lng;
     } else if (newAddress && (addressChanged || lat == null)) {
-      try {
-        const q = [name.trim(), newAddress].join(' ');
-        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-        const g = await res.json();
-        lat = g.lat ?? null;
-        lng = g.lng ?? null;
-      } catch {
-        /* 離線或失敗都可之後補 */
+      // 先用「店名+地址」查（比較精準），查不到再只用地址——沒登錄的小店加了店名會整筆查不到
+      for (const q of [`${name.trim()} ${newAddress}`, newAddress]) {
+        try {
+          const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+          const g = await res.json();
+          if (g.lat != null && g.lng != null) {
+            lat = g.lat;
+            lng = g.lng;
+            break;
+          }
+        } catch {
+          /* 離線或失敗都可之後補 */
+        }
       }
     } else if (!newAddress && addressChanged) {
       lat = null;
       lng = null;
     }
 
+    // 反查沒給國家就用座標推（離線表），推不到就留空 → 推薦時算「未知位置」
+    const byCoords = countryOf(lat, lng);
+    const country = region.current.country ?? byCoords?.name ?? null;
+    const countryCode = region.current.countryCode ?? byCoords?.code ?? null;
+
     onSave({
       id: initial?.id ?? crypto.randomUUID(),
       name: name.trim(),
       address: newAddress,
       city: city.trim() || null,
+      district: district.trim() || null,
+      country,
+      countryCode,
       cuisine: cuisine.trim() || null,
       dishes: dishes
         .split(/[、,，]/)
@@ -215,8 +238,11 @@ export default function EditSheet({
           </div>
         </div>
         <div className="field">
-          <label>地區（縣市）</label>
-          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="例：台北市" />
+          <label>地區（縣市 / 行政區）</label>
+          <div className="field-row">
+            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="例：台北市、東京都" />
+            <input value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="例：信義區" />
+          </div>
         </div>
         <div className="field">
           <label>類型</label>

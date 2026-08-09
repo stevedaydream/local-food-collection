@@ -15,9 +15,17 @@
   - 存下來的 Google 連結會讓卡片與 widget 的「導航」直接開那家店的地圖頁（不是只掉一根座標針）
   - Android：Google 地圖 →「分享」→ 口袋美食地圖，表單會自動解析；瀏覽器 PWA 也吃分享進來的連結（share_target 的 text/url）
 - 🗺️ 地圖檢視暫時下架（`components/MapView.tsx` 保留為接口，未來改接 Google Maps API；地理編碼 `/api/geocode` 照常運作）
-- 🎲 **吃什麼？**：2 秒全屏骰子動畫後隨機推薦，顯示店名 + 地址 + Google Maps 導航連結，並列出沒被骰到的其他候選；可按類型篩選、不滿意就「換一家」
-  - **📍 附近模式**：口袋名單空空（或主動切換）時，用 GPS 定位（失敗退回台北市中心）搜尋附近餐廳來骰——設 `GOOGLE_MAPS_API_KEY` 走 Google Places Nearby（含評分），未設定退回 OSM Overpass
+- 🎲 **吃什麼？**：2 秒全屏骰子動畫後隨機推薦，顯示店名 + 地址 + 距離 + Google Maps 導航連結，並列出沒被骰到的其他候選；可按類型篩選、不滿意就「換一家」
+  - **🌏 只推你去得了的**：「🍜 我的名單」只骰**你目前所在國家**的收藏（人在日本就不會推台灣的店），並按距離排序。本國收藏少於 5 家時自動混入附近店家，卡片標示「🍜 口袋 / 📍 附近 / 🌐 公共庫」來源，口袋收藏權重 ×3
+    - 國家判定：先查離線座標範圍表（`lib/country-bbox.ts`，零 API、可離線），落在表外才打一次反查
+    - 沒座標的收藏算不出國家，不進骰盅但會提示「N 家沒有位置資訊」，可一鍵補座標
+  - **📍 附近模式**：口袋名單空空（或主動切換）時搜尋附近餐廳來骰——設 `GOOGLE_MAPS_API_KEY` 走 Google Places Nearby（含評分），未設定退回 OSM Overpass
+- 📍 **標題列顯示所在地**：`📍 日本 東京都 荒川區`。已授權過才自動定位（不主動彈權限），點一下可**重新定位 / 手動指定 / 回自動**
+  - 定位失敗**不再退回台北**（那會讓人在日本卻被判成在台灣），改用上次成功的位置並標示「上次位置」
+  - 手動指定一直有效，但 GPS 判定你已在別的國家時自動解除
+  - 快取：定位 5 分鐘、附近搜尋 10 分鐘，移動超過 500m 才重查
 - 🔎 **條件篩選**：名單可依 來源（IG/FB…）× 地區（縣市）× 類型（早午餐、火鍋…）快速過濾，分類欄位在編輯表單都能補
+  - **📍 這附近**：一顆 toggle，只看目前所在國家的收藏並按距離排序，卡片上直接標距離（還沒定位時按了會開位置面板）
 - 📲 **PWA（類 widget 體驗）**：
   - 安裝到手機主畫面，**長按圖示 → 「🎲 吃什麼」捷徑**直接彈出隨機推薦
   - Android：在任何 App 截圖後按「分享」→ 選「美食地圖」，直接進入 AI 分析（Web Share Target）
@@ -32,9 +40,14 @@
 - 登入：瀏覽器走 GIS 官方按鈕取 ID token；Android 殼走 Credential Manager 原生流程（`GoogleAuthPlugin.getIdToken`）；兩邊都用 `supabase.auth.signInWithIdToken` 換 session
 - 同步：開頁時 pull 合併（同 id 以雲端為準、「曾同步過但雲端已刪」不復活）；每次本機寫入 debounce 2 秒全量 push（upsert + 刪多餘列）；未登入/離線自動降級純 localStorage
 - Schema：`profiles` + `restaurants`（owner-only RLS；`visibility` 欄位已預留 Phase 2 朋友分享）
-  - 想讓「Google 地圖連結」也跨裝置同步，在 Supabase 跑一次
-    `alter table restaurants add column if not exists google_url text;`
-    沒跑也不會壞：`lib/cloud-sync.ts` 撞到缺欄位會自動改推不含這欄的資料，連結留在本機
+  - 想讓後加的欄位也跨裝置同步，在 Supabase 跑一次：
+    ```sql
+    alter table restaurants add column if not exists google_url   text;
+    alter table restaurants add column if not exists district     text;
+    alter table restaurants add column if not exists country      text;
+    alter table restaurants add column if not exists country_code text;
+    ```
+    沒跑也不會壞：`lib/cloud-sync.ts` 撞到缺欄位會自動改推不含這些欄的資料，值留在本機
 - 開發者設定：`.env.example` 的 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`，並在 Supabase Dashboard → Authentication → Google provider 啟用 + 把 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` 加進 Client IDs
 ### 朋友分享（Phase 2）
 
@@ -112,7 +125,12 @@ npm run dev                 # http://localhost:3000
 | `app/api/place-search/route.ts` | 店名 → 地址+座標（有 `GOOGLE_MAPS_API_KEY` 走 Google Places，否則 Nominatim） |
 | `app/api/resolve-place/route.ts` | 萬用解析：貼地址 → 店名/連結、貼 Google 連結 → 店名/地址（短網址先展開，連鎖店用座標框限制範圍） |
 | `lib/place-url.ts` | 純函式：Google 地圖網址解析（店名/座標/place_id）、台灣地址推縣市、產生地圖連結 |
-| `app/api/nearby/route.ts` | 座標 → 附近餐廳清單（Google Places Nearby / OSM Overpass） |
+| `app/api/nearby/route.ts` | 座標 → 附近餐廳清單（Google Places Nearby / OSM Overpass；Overpass 一定要帶 `User-Agent` + `Accept`，少一個就回 406） |
+| `app/api/reverse-geocode/route.ts` | 座標 → 國家 / 縣市 / 行政區（Nominatim reverse 代理） |
+| `lib/reverse-geo.ts` | 反查欄位對應：Nominatim 各國欄位不統一，東京 23 區沒有 province，靠 ISO3166-2 補「東京都」 |
+| `lib/country-bbox.ts` | 離線座標→國家判定表（面積小的先比對，港澳贏中國）+ 距離計算 |
+| `lib/location.ts` | 目前位置的單一來源：定位 / 反查 / 快取 / 手動指定與自動解除 |
+| `components/LocationPanel.tsx` | 標題列 📍 點開的位置面板（重新定位 / 手動指定 / 回自動） |
 | `components/RandomSheet.tsx` | 隨機推薦：口袋/附近雙來源 + 骰子動畫 + 遺珠清單 |
 | `components/DiceRoll.tsx` | 全屏 2 秒骰子滾動動畫 |
 | `lib/geo.ts` | 取得定位（Capacitor 原生 / 瀏覽器，失敗退回台北） |
@@ -126,7 +144,7 @@ npm run dev                 # http://localhost:3000
 | `public/sw.js` | Service worker：PWA 安裝 + 接收分享的截圖 |
 | `public/manifest.webmanifest` | PWA 設定：主畫面捷徑、share_target |
 | `capacitor.config.ts` | Capacitor 設定：Android 殼載入線上網址（`server.url`） |
-| `lib/widget-sync.ts` | 在 Capacitor 殼內把口袋名單同步給原生 widget（瀏覽器環境 no-op） |
+| `lib/widget-sync.ts` | 在 Capacitor 殼內把口袋名單與目前位置同步給原生 widget（瀏覽器環境 no-op） |
 | `android/` | Android 原生殼 + 兩個主畫面 widget（見下方） |
 
 ## Android 原生殼 + Widget
@@ -139,7 +157,12 @@ Capacitor 殼，WebView 直接載入 `https://local-food-collection.vercel.app`�
 #### widget 選區域
 
 卡片右上角的 **📍 標籤**（或新增 widget 時 launcher 跳出的設定畫面）可以選這張卡片只抽哪個縣市——
-所以可以並排放「台北」「台中」兩張卡片各自骰。實作：
+所以可以並排放「台北」「台中」兩張卡片各自骰。另有一項 **📍 跟著我的位置**：自動跟著你目前所在的
+一級行政區（在東京就等於選了東京都），那一級沒有收藏就放寬到同國家，標籤顯示「📍 東京都（自動）」。
+
+widget 自己抓 GPS 需要背景定位權限，所以位置是由 App 每次成功定位時經
+`WidgetSync.syncLocation` 推進 SharedPreferences；同步名單時也會順便補好每筆的 `countryCode`
+（原生端沒有座標→國家對照表，統一在 `lib/widget-sync.ts` 算好再送）。實作：
 
 - `WidgetConfigActivity`：`widget_random_food_info.xml` 的 `android:configure`，選項是名單裡出現過的 `city` +「全部區域」，各項附家數
 - `widget_random_food_info.xml` 帶 `widgetFeatures="reconfigurable|configuration_optional"`：Android 12+ 新增時不強迫設定（預設全部），之後隨時點 📍 改

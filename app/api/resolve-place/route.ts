@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildGoogleUrl, findUrl, guessCity, isMapsUrl, isShortUrl, parseMapsUrl } from '@/lib/place-url';
+import { reverseGeo } from '@/lib/reverse-geo';
+import { countryOf } from '@/lib/country-bbox';
 
 export const maxDuration = 25;
 
@@ -317,10 +319,18 @@ export async function GET(req: Request) {
     const { place, googleUrl, resolved, note } =
       kind === 'link' ? await fromLink(key, url!) : await fromText(key, raw);
 
+    // 有座標就反查正式行政區（台北市/信義區、東京都/荒川區），存檔後推薦的國家硬篩才有依據
+    const region =
+      place.lat != null && place.lng != null ? await reverseGeo(place.lat, place.lng) : null;
+    const fallbackCountry = countryOf(place.lat, place.lng);
+
     return NextResponse.json({
       name: place.name,
       address: place.address,
-      city: guessCity(place.address) ?? guessCity(kind === 'text' ? raw : null),
+      city: region?.city ?? guessCity(place.address) ?? guessCity(kind === 'text' ? raw : null),
+      district: region?.district ?? null,
+      country: region?.country ?? fallbackCountry?.name ?? null,
+      countryCode: region?.countryCode ?? fallbackCountry?.code ?? null,
       cuisine: place.cuisine,
       lat: place.lat,
       lng: place.lng,
@@ -337,6 +347,9 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ...EMPTY,
       city: null,
+      district: null,
+      country: null,
+      countryCode: null,
       googleUrl: null,
       kind,
       source: key ? 'google' : 'osm',
