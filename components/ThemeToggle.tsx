@@ -15,6 +15,8 @@ export default function ThemeToggle() {
     const initial = loadThemeChoice();
     setChoice(initial);
     setShown(resolveTheme(initial));
+    // 進來就套一次：<head> 的開機腳本可能比 Next 注入 meta 還早跑，狀態列顏色要補上
+    applyTheme(initial);
     // 使用者在系統層切換時，auto 模式要跟著動
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => {
@@ -42,7 +44,7 @@ export default function ThemeToggle() {
     setShown(next);
   };
 
-  // auto 時 applyTheme 沒被呼叫過，補一次讓狀態列顏色正確
+  // 系統在 auto 模式下換色時，狀態列也要跟著換
   useEffect(() => {
     if (choice === 'auto') applyTheme('auto');
   }, [choice, shown]);

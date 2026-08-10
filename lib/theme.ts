@@ -32,10 +32,20 @@ export function applyTheme(choice: ThemeChoice) {
   if (choice === 'auto') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', choice);
 
-  const meta = document.querySelector('meta[name="theme-color"]:not([media])')
-    ?? Object.assign(document.createElement('meta'), { name: 'theme-color' });
-  meta.setAttribute('content', BAR[resolveTheme(choice)]);
-  if (!meta.parentNode) document.head.appendChild(meta);
+  // 全部 theme-color meta 一起改（含 Next 注入的那個），狀態列才不會跟畫面不同調
+  const color = BAR[resolveTheme(choice)];
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  if (metas.length === 0) {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = color;
+    document.head.appendChild(meta);
+    return;
+  }
+  metas.forEach((meta) => {
+    meta.removeAttribute('media');
+    meta.setAttribute('content', color);
+  });
 }
 
 export function saveThemeChoice(choice: ThemeChoice) {
@@ -52,4 +62,10 @@ export function saveThemeChoice(choice: ThemeChoice) {
  * 在 <head> 就跑掉的一行腳本：先把 data-theme 補上，避免深色使用者看到白色閃一下。
  * 這裡回傳字串給 app/layout.tsx 內嵌。
  */
-export const THEME_BOOT_SCRIPT = `try{var t=localStorage.getItem('${KEY}');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
+export const THEME_BOOT_SCRIPT =
+  `try{var t=localStorage.getItem('${KEY}');` +
+  `var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);` +
+  `if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);` +
+  `var m=document.querySelector('meta[name="theme-color"]');` +
+  `if(m){m.removeAttribute('media');m.setAttribute('content',d?'${BAR.dark}':'${BAR.light}')}` +
+  `}catch(e){}`;

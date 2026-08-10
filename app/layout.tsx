@@ -10,10 +10,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f2f7f5' },
-    { media: '(prefers-color-scheme: dark)', color: '#0e1d20' },
-  ],
+  // 只留一個（不帶 media）的 theme-color，由 lib/theme.ts 依實際主題改寫；
+  // 帶 media 的版本在文件順序上會贏過 JS 新增的那個，手動選色就會失效。
+  themeColor: '#f2f7f5',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
