@@ -32,7 +32,9 @@ public final class WidgetData {
     /** 不限區域 */
     public static final String REGION_ALL = "";
     /**
-     * 跟著 App 最後一次定位的位置：由細到粗退讓——二級行政區 → 一級 → 同國家 → 全部（見 inRegion）。
+     * 跟著 App 最後一次定位的位置：跟到「縣市」這一級就好（見 inRegion）。
+     * 不跟到行政區——你在信義區不代表只想吃信義區，整個台北市都該納入；
+     * 真的要鎖行政區請在設定畫面手動選第二層。
      */
     public static final String REGION_FOLLOW = "follow";
     /** 區域字串把兩層黏起來時的分隔符：「新北市|汐止區」（地名不會出現這個字） */
@@ -159,13 +161,8 @@ public final class WidgetData {
      */
     public static List<JSONObject> inRegion(Context context, String region) {
         if (REGION_FOLLOW.equals(region)) {
-            // 由細到粗退讓：這個區 → 這個縣市 → 這個國家 → 全部
+            // 由粗到細只到縣市：這個縣市 → 這個國家 → 全部
             String city = locField(context, "city");
-            String district = locField(context, "district");
-            if (!city.isEmpty() && !district.isEmpty()) {
-                List<JSONObject> hit = matching(context, city, district, null);
-                if (!hit.isEmpty()) return hit;
-            }
             if (!city.isEmpty()) {
                 List<JSONObject> hit = matching(context, city, null, null);
                 if (!hit.isEmpty()) return hit;
@@ -204,13 +201,9 @@ public final class WidgetData {
         return r.optString(key, "").trim();
     }
 
-    /** widget 上「📍 …」要顯示什麼：跟著位置時顯示實際跟到的那一層 */
+    /** widget 上「📍 …」要顯示什麼：跟著位置時顯示實際跟到的那一層（最細到縣市） */
     public static String followLabel(Context context) {
         String city = locField(context, "city");
-        String district = locField(context, "district");
-        if (!city.isEmpty() && !district.isEmpty() && !matching(context, city, district, null).isEmpty()) {
-            return district;
-        }
         if (!city.isEmpty() && !matching(context, city, null, null).isEmpty()) return city;
         String country = locField(context, "country");
         String code = locField(context, "countryCode");

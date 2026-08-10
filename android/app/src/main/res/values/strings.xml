@@ -21,7 +21,7 @@
 
     <!-- Widget 區域設定 -->
     <string name="widget_config_title">這張卡片要抽哪個區域？</string>
-    <string name="widget_config_hint">點一下就生效。先選縣市，有行政區的話下面會再讓你選一層；選「跟著我的位置」會自動跟著你所在的行政區，那裡沒收藏就依序放寬到縣市、國家。</string>
+    <string name="widget_config_hint">點一下就生效。先選縣市，有行政區的話下面會再讓你選一層（選「整個 ○○」就是整個縣市都納入）；「跟著我的位置」只跟到縣市，不會縮到行政區。</string>
     <string name="widget_config_follow_at">📍 跟著我的位置（現在：%1$s）</string>
     <string name="widget_config_follow_empty">📍 跟著我的位置（打開 App 定位後生效）</string>
     <string name="widget_config_all">全部區域</string>

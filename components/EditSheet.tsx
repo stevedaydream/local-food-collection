@@ -282,7 +282,11 @@ export default function EditSheet({
           <label>地區（縣市 / 行政區）</label>
           <div className="field-row">
             <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="例：台北市、東京都" />
-            <input value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="例：信義區" />
+            <input
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+              placeholder="行政區（可留空＝整個縣市）"
+            />
           </div>
         </div>
         <div className="field">
