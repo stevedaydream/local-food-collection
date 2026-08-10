@@ -29,11 +29,37 @@
         android:layout_weight="1"
         android:layout_marginTop="12dp">
 
-        <RadioGroup
-            android:id="@+id/widget_config_regions"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical" />
+            android:orientation="vertical">
+
+            <!-- 第一層：縣市 -->
+            <RadioGroup
+                android:id="@+id/widget_config_regions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- 第二層：行政區（選了有二級的縣市才出現） -->
+            <TextView
+                android:id="@+id/widget_config_district_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:textColor="@color/celadon"
+                android:visibility="gone" />
+
+            <RadioGroup
+                android:id="@+id/widget_config_districts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical"
+                android:visibility="gone" />
+        </LinearLayout>
     </ScrollView>
 
     <LinearLayout

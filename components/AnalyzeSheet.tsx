@@ -218,7 +218,7 @@ export default function AnalyzeSheet({
         // 國家用離線表算（零成本）；拍照模式再補正式的縣市/行政區
         const hit = countryOf(lat, lng);
         let city = d.city;
-        let district: string | null = null;
+        let district = d.district ?? null;
         let country = hit?.name ?? null;
         let countryCode = hit?.code ?? null;
         if (kind === 'photo' && lat != null && lng != null) {

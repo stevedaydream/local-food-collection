@@ -33,7 +33,10 @@ export interface SavedRestaurant {
 export interface ExtractedRestaurant {
   name: string;
   address: string | null;
+  /** 一級行政區：台北市 / 東京都 */
   city: string | null;
+  /** 二級行政區：信義區 / 荒川區 */
+  district?: string | null;
   cuisine: string | null;
   dishes: string[];
   price_range: string | null;

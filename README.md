@@ -163,8 +163,9 @@ Capacitor 殼，WebView 直接載入 `https://local-food-collection.vercel.app`�
 
 #### widget 選區域
 
-卡片右上角的 **📍 標籤**（或新增 widget 時 launcher 跳出的設定畫面）可以選這張卡片只抽哪個縣市——
-所以可以並排放「台北」「台中」兩張卡片各自骰。另有一項 **📍 跟著我的位置**：自動跟著你目前所在的
+卡片右上角的 **📍 標籤**（或新增 widget 時 launcher 跳出的設定畫面）可以**分兩層**選這張卡片要抽哪裡：
+先選縣市，該縣市底下有行政區就再讓你選一層（可選「整個 ○○」＝只鎖一級），存成 `縣市|行政區`。
+所以可以並排放「台北」「汐止區」兩張卡片各自骰。設定畫面點一下就生效（返回鍵離開也算數）。另有一項 **📍 跟著我的位置**：自動跟著你目前所在的
 一級行政區（在東京就等於選了東京都），那一級沒有收藏就放寬到同國家，標籤顯示「📍 東京都（自動）」。
 
 widget 自己抓 GPS 需要背景定位權限，所以位置是由 App 每次成功定位時經
@@ -173,6 +174,9 @@ widget 自己抓 GPS 需要背景定位權限，所以位置是由 App 每次成
 
 - `WidgetConfigActivity`：`widget_random_food_info.xml` 的 `android:configure`，選項是名單裡出現過的 `city` +「全部區域」，各項附家數
 - `widget_random_food_info.xml` 帶 `widgetFeatures="reconfigurable|configuration_optional"`：Android 12+ 新增時不強迫設定（預設全部），之後隨時點 📍 改
+- 「跟著我的位置」由細到粗退讓：**所在行政區 → 縣市 → 同國家 → 全部**，標籤顯示實際跟到的那一層
+- `lib/place-url.ts` 的 `splitCityDistrict()`：舊資料的 `city` 常把兩層黏在一起（舊 AI prompt 的範例就是「台北 大安區」），
+  存檔前會拆成 `city` + `district`，⚙️ 設定的「補齊地區資料」也會把既有資料就地拆開，widget 才分得開兩層
 - `WidgetData`：區域與「目前抽到哪一家」都存成 per `appWidgetId`（`region_<id>` / `current_restaurant_id_<id>`），widget 移除時 `onDeleted` 清掉；每張卡片的 PendingIntent request code 也依 id 分開，換一家只動被點的那張
 - 該區域沒有收藏時卡片顯示「這個區域還沒有收藏」，📍 仍可點回別區
 

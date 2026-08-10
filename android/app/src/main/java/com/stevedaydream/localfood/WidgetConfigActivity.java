@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -27,9 +28,15 @@ import java.util.List;
 public class WidgetConfigActivity extends AppCompatActivity {
 
     private int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
-    /** 每顆 radio 對應的區域字串，index 與 RadioGroup 的子項一致；第 0 個是「全部」 */
+    /** 第一層每顆 radio 對應的值（REGION_FOLLOW / REGION_ALL / 縣市名），index 與子項一致 */
     private final ArrayList<String> values = new ArrayList<>();
+    /** 第二層每顆 radio 對應的行政區名；第 0 個是「整個縣市」＝空字串 */
+    private final ArrayList<String> districtValues = new ArrayList<>();
     private RadioGroup group;
+    private RadioGroup districtGroup;
+    private TextView districtLabel;
+    /** 目前選到的縣市（第二層要掛在它底下） */
+    private String selectedCity = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,11 +56,17 @@ public class WidgetConfigActivity extends AppCompatActivity {
 
         setContentView(R.layout.widget_config);
         group = findViewById(R.id.widget_config_regions);
+        districtGroup = findViewById(R.id.widget_config_districts);
+        districtLabel = findViewById(R.id.widget_config_district_label);
         buildOptions();
         capListHeight();
 
         // 點選項就存，返回鍵離開也保留選擇
-        group.setOnCheckedChangeListener((g, checkedId) -> save());
+        group.setOnCheckedChangeListener((g, checkedId) -> {
+            saveCity();
+            buildDistricts();
+        });
+        districtGroup.setOnCheckedChangeListener((g, checkedId) -> saveDistrict());
         findViewById(R.id.widget_config_ok).setOnClickListener(v -> finish());
     }
 
@@ -64,8 +77,10 @@ public class WidgetConfigActivity extends AppCompatActivity {
     }
 
     private void buildOptions() {
-        String selected = WidgetData.getRegion(this, appWidgetId);
-        List<String> regions = WidgetData.regionsIncluding(this, selected);
+        String saved = WidgetData.getRegion(this, appWidgetId);
+        String savedCity = WidgetData.cityOfRegion(saved);
+        boolean follow = WidgetData.REGION_FOLLOW.equals(saved);
+        List<String> regions = WidgetData.regionsIncluding(this, follow ? "" : savedCity);
 
         values.clear();
         group.removeAllViews();
@@ -74,9 +89,54 @@ public class WidgetConfigActivity extends AppCompatActivity {
         addOption(WidgetData.REGION_ALL, getString(R.string.widget_config_all));
         for (String region : regions) addOption(region, region);
 
-        int index = Math.max(0, values.indexOf(selected));
+        selectedCity = follow ? "" : savedCity;
+        int index = Math.max(0, values.indexOf(follow ? WidgetData.REGION_FOLLOW : selectedCity));
         View checked = group.getChildAt(index);
         if (checked instanceof RadioButton) ((RadioButton) checked).setChecked(true);
+        buildDistricts();
+    }
+
+    /**
+     * 第二層：選到的縣市底下有行政區才顯示。
+     * 第一顆是「整個 ○○」，選它就等於只鎖一級。
+     */
+    private void buildDistricts() {
+        districtValues.clear();
+        districtGroup.setOnCheckedChangeListener(null);
+        districtGroup.removeAllViews();
+
+        List<String> districts = selectedCity.isEmpty()
+                ? new ArrayList<>()
+                : WidgetData.districts(this, selectedCity);
+        if (districts.isEmpty()) {
+            districtGroup.setVisibility(View.GONE);
+            districtLabel.setVisibility(View.GONE);
+            districtGroup.setOnCheckedChangeListener((g, id) -> saveDistrict());
+            return;
+        }
+
+        districtLabel.setText(getString(R.string.widget_config_district_label, selectedCity));
+        districtLabel.setVisibility(View.VISIBLE);
+        districtGroup.setVisibility(View.VISIBLE);
+
+        addDistrictOption("", getString(R.string.widget_config_district_all, selectedCity));
+        for (String district : districts) addDistrictOption(district, district);
+
+        String savedDistrict = WidgetData.districtOfRegion(WidgetData.getRegion(this, appWidgetId));
+        int index = Math.max(0, districtValues.indexOf(savedDistrict));
+        View checked = districtGroup.getChildAt(index);
+        if (checked instanceof RadioButton) ((RadioButton) checked).setChecked(true);
+        districtGroup.setOnCheckedChangeListener((g, id) -> saveDistrict());
+    }
+
+    private void addDistrictOption(String value, String label) {
+        RadioButton button = new RadioButton(this);
+        button.setId(View.generateViewId());
+        int count = WidgetData.countInRegion(this, WidgetData.composeRegion(selectedCity, value));
+        button.setText(getString(R.string.widget_config_option, label, count));
+        style(button);
+        districtGroup.addView(button);
+        districtValues.add(value);
     }
 
     /** 「📍 跟著我的位置」：說明文字依有沒有收到過定位而不同 */
@@ -121,11 +181,25 @@ public class WidgetConfigActivity extends AppCompatActivity {
         button.setPadding(button.getPaddingLeft(), 16, button.getPaddingRight(), 16);
     }
 
-    /** 存下選擇並立刻重繪 widget；不關畫面，讓使用者看得到標籤變了 */
-    private void save() {
+    /** 選了第一層：跟著位置／全部就直接存，選縣市則先存一級（第二層預設整個縣市） */
+    private void saveCity() {
         int index = group.indexOfChild(group.findViewById(group.getCheckedRadioButtonId()));
         if (index < 0 || index >= values.size()) return;
-        WidgetData.setRegion(this, appWidgetId, values.get(index));
+        String value = values.get(index);
+        selectedCity = WidgetData.REGION_FOLLOW.equals(value) ? "" : value;
+        apply(value);
+    }
+
+    /** 選了第二層：組成「縣市|行政區」存回去 */
+    private void saveDistrict() {
+        int index = districtGroup.indexOfChild(districtGroup.findViewById(districtGroup.getCheckedRadioButtonId()));
+        if (index < 0 || index >= districtValues.size() || selectedCity.isEmpty()) return;
+        apply(WidgetData.composeRegion(selectedCity, districtValues.get(index)));
+    }
+
+    /** 存下選擇並立刻重繪 widget；不關畫面，讓使用者看得到標籤變了 */
+    private void apply(String region) {
+        WidgetData.setRegion(this, appWidgetId, region);
         RandomFoodWidgetProvider.refreshOne(this, appWidgetId);
         setResult(RESULT_OK, resultIntent());
     }

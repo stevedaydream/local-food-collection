@@ -32,10 +32,11 @@ public final class WidgetData {
     /** 不限區域 */
     public static final String REGION_ALL = "";
     /**
-     * 跟著 App 最後一次定位的位置：先試「目前的一級行政區」，
-     * 那一級沒有收藏就放寬到「同國家」（見 inRegion）。
+     * 跟著 App 最後一次定位的位置：由細到粗退讓——二級行政區 → 一級 → 同國家 → 全部（見 inRegion）。
      */
-    public static final String REGION_FOLLOW = "follow";
+    public static final String REGION_FOLLOW = "follow";
+    /** 區域字串把兩層黏起來時的分隔符：「新北市|汐止區」（地名不會出現這個字） */
+    private static final String LEVEL_SEP = "|";
 
     private WidgetData() {}
 
@@ -91,6 +92,40 @@ public final class WidgetData {
         return new ArrayList<>(set);
     }
 
+    /** 某個一級行政區底下出現過的二級行政區 */
+    public static List<String> districts(Context context, String city) {
+        JSONArray list = getRestaurants(context);
+        TreeSet<String> set = new TreeSet<>();
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject r = list.optJSONObject(i);
+            if (r == null || !city.equals(city(r))) continue;
+            String d = str(r, "district");
+            if (!d.isEmpty()) set.add(d);
+        }
+        return new ArrayList<>(set);
+    }
+
+    /** 把「一級」或「一級|二級」組成要存的區域字串 */
+    public static String composeRegion(String city, String district) {
+        if (city == null || city.isEmpty()) return REGION_ALL;
+        if (district == null || district.isEmpty()) return city;
+        return city + LEVEL_SEP + district;
+    }
+
+    /** 區域字串的一級部分 */
+    public static String cityOfRegion(String region) {
+        if (region == null) return "";
+        int at = region.indexOf(LEVEL_SEP);
+        return at < 0 ? region : region.substring(0, at);
+    }
+
+    /** 區域字串的二級部分（沒有就回空字串） */
+    public static String districtOfRegion(String region) {
+        if (region == null) return "";
+        int at = region.indexOf(LEVEL_SEP);
+        return at < 0 ? "" : region.substring(at + 1);
+    }
+
     public static String getRegion(Context context, int appWidgetId) {
         return prefs(context).getString(PREFIX_REGION + appWidgetId, REGION_ALL);
     }
@@ -124,33 +159,44 @@ public final class WidgetData {
      */
     public static List<JSONObject> inRegion(Context context, String region) {
         if (REGION_FOLLOW.equals(region)) {
-            List<JSONObject> byCity = matching(context, city(context, null), null);
-            if (!byCity.isEmpty()) return byCity;
-            return matching(context, null, locField(context, "countryCode"));
+            // 由細到粗退讓：這個區 → 這個縣市 → 這個國家 → 全部
+            String city = locField(context, "city");
+            String district = locField(context, "district");
+            if (!city.isEmpty() && !district.isEmpty()) {
+                List<JSONObject> hit = matching(context, city, district, null);
+                if (!hit.isEmpty()) return hit;
+            }
+            if (!city.isEmpty()) {
+                List<JSONObject> hit = matching(context, city, null, null);
+                if (!hit.isEmpty()) return hit;
+            }
+            String country = locField(context, "countryCode");
+            if (!country.isEmpty()) {
+                List<JSONObject> hit = matching(context, null, null, country);
+                // 舊資料沒有 countryCode 會全部落空；那就別把畫面弄成空白，退回全部
+                if (!hit.isEmpty()) return hit;
+            }
+            return matching(context, null, null, null);
         }
-        return matching(context, region, null);
+        return matching(context, cityOfRegion(region), districtOfRegion(region), null);
     }
 
-    /** city 有值就比一級行政區，countryCode 有值就比國家；兩者都空＝全部 */
-    private static List<JSONObject> matching(Context context, String city, String countryCode) {
+    /** city / district / countryCode 有值就比，全部為空＝不篩 */
+    private static List<JSONObject> matching(Context context, String city, String district, String countryCode) {
         JSONArray list = getRestaurants(context);
         List<JSONObject> out = new ArrayList<>();
         boolean byCity = city != null && !city.isEmpty();
+        boolean byDistrict = district != null && !district.isEmpty();
         boolean byCountry = countryCode != null && !countryCode.isEmpty();
         for (int i = 0; i < list.length(); i++) {
             JSONObject r = list.optJSONObject(i);
             if (r == null) continue;
             if (byCity && !city.equals(city(r))) continue;
+            if (byDistrict && !district.equals(str(r, "district"))) continue;
             if (byCountry && !countryCode.equalsIgnoreCase(str(r, "countryCode"))) continue;
             out.add(r);
         }
         return out;
-    }
-
-    /** 目前位置的一級行政區（給 REGION_FOLLOW 用）；fallback 為呼叫端傳入的預設 */
-    private static String city(Context context, String fallback) {
-        String city = locField(context, "city");
-        return city.isEmpty() ? (fallback == null ? "" : fallback) : city;
     }
 
     private static String str(JSONObject r, String key) {
@@ -158,12 +204,19 @@ public final class WidgetData {
         return r.optString(key, "").trim();
     }
 
-    /** widget 上「📍 …」要顯示什麼：跟著位置時顯示實際跟到的層級 */
+    /** widget 上「📍 …」要顯示什麼：跟著位置時顯示實際跟到的那一層 */
     public static String followLabel(Context context) {
         String city = locField(context, "city");
-        if (!city.isEmpty() && !matching(context, city, null).isEmpty()) return city;
+        String district = locField(context, "district");
+        if (!city.isEmpty() && !district.isEmpty() && !matching(context, city, district, null).isEmpty()) {
+            return district;
+        }
+        if (!city.isEmpty() && !matching(context, city, null, null).isEmpty()) return city;
         String country = locField(context, "country");
-        if (!country.isEmpty()) return country;
+        String code = locField(context, "countryCode");
+        if (!country.isEmpty() && !code.isEmpty() && !matching(context, null, null, code).isEmpty()) {
+            return country;
+        }
         return "";
     }
 

@@ -21,11 +21,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-Hant">
-      <head>
-        {/* 在畫面畫出來之前先套上主題，深色使用者才不會看到白色閃一下 */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-      </head>
       <body>
+        {/*
+          在畫面畫出來之前先套上主題，深色使用者才不會看到白色閃一下。
+          放 <body> 第一個子元素而不是自己寫 <head>——App Router 不支援手動 <head>，
+          那樣做會讓 Next 的 CSS 注入失效（畫面只剩骨架）。
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {children}
         <script
           dangerouslySetInnerHTML={{

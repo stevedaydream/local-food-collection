@@ -32,6 +32,7 @@ import {
 } from '@/lib/google-drive';
 import { getLocalConfig } from '@/lib/local-mode';
 import { loadThemeChoice, saveThemeChoice, type ThemeChoice } from '@/lib/theme';
+import { splitCityDistrict } from '@/lib/place-url';
 import LocalSetupSheet from './LocalSetupSheet';
 
 interface ProviderInfo {
@@ -207,17 +208,32 @@ export default function SettingsSheet({
    */
   const handleBackfillRegions = async () => {
     const all = loadRestaurants();
+    const byId = new Map(all.map((r) => [r.id, r]));
+
+    // 先在本機把「兩層黏在一起」的舊資料拆開（例如 city='台北 大安區'），不用連網
+    let split = 0;
+    for (const r of all) {
+      if (r.district || !r.city) continue;
+      const parts = splitCityDistrict(r.city);
+      if (parts.district) {
+        byId.set(r.id, { ...r, city: parts.city, district: parts.district });
+        split++;
+      }
+    }
+
+    // 有座標的再反查，補上正式的縣市／行政區／國家
     const targets = all.filter(
       (r) => r.lat != null && r.lng != null && (!r.district || !r.countryCode),
     );
-    if (!targets.length) {
-      setGeoMsg({ text: '所有有座標的收藏都已經有地區資料了。' });
+    if (!targets.length && !split) {
+      setGeoMsg({ text: '所有收藏都已經有地區資料了。' });
       return;
     }
     setGeoMsg(null);
-    const byId = new Map(all.map((r) => [r.id, r]));
     let done = 0;
-    for (const r of targets) {
+    for (const target of targets) {
+      // 拿拆過的那一份當底，反查結果再蓋上去
+      const r = byId.get(target.id) ?? target;
       setGeoBusy(`補齊中… ${++done}/${targets.length}`);
       try {
         const res = await fetch(`/api/reverse-geocode?lat=${r.lat}&lng=${r.lng}`);
@@ -245,7 +261,14 @@ export default function SettingsSheet({
     saveRestaurants(merged);
     onRestored(merged);
     setGeoBusy('');
-    setGeoMsg({ text: `已補齊 ${targets.length} 筆的縣市 / 行政區 / 國家。` });
+    setGeoMsg({
+      text: [
+        split ? `拆開 ${split} 筆黏在一起的地區` : '',
+        targets.length ? `反查補齊 ${targets.length} 筆的縣市／行政區／國家` : '',
+      ]
+        .filter(Boolean)
+        .join('、') + '。',
+    });
   };
 
   const [showLocalSetup, setShowLocalSetup] = useState(false);

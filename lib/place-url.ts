@@ -131,6 +131,56 @@ export function normalizeRegion(name: string | null | undefined): string | null 
   return out || null;
 }
 
+/** 台灣縣市的簡稱 → 正式名稱（AI 常只寫「台北 大安區」） */
+const TW_SHORT = new Map<string, string>(
+  TW_CITIES.map((c) => {
+    const name = c.replace(/臺/g, '台');
+    return [name.slice(0, -1), name] as [string, string];
+  }),
+);
+/** 二級行政區的字尾：區、鄉、鎮、市（縣轄市）、日本的町村 */
+const LEVEL2 = /(區|鄉|鎮|市|町|村)$/;
+
+/**
+ * 把「一個地區字串」拆成一級 / 二級行政區。
+ *
+ * 舊資料的 city 欄位常常是兩層黏在一起（AI 舊 prompt 的範例就是「台北 大安區」），
+ * 而 widget 與篩選要能分級選，所以存進去之前先拆開：
+ * 「台北 大安區」→ 台北市 / 大安區、「新北市汐止區」→ 新北市 / 汐止區、
+ * 「東京都荒川區」→ 東京都 / 荒川區。拆不出來就整串當一級。
+ */
+export function splitCityDistrict(raw: string | null | undefined): {
+  city: string | null;
+  district: string | null;
+} {
+  const text = normalizeRegion(raw);
+  if (!text) return { city: null, district: null };
+
+  // 1) 有空白或頓號分隔：最後一段像二級就用它，前一段當一級
+  //    （「日本 東京都 荒川區」這種三段式也吃得下，國家另外有欄位存）
+  const parts = text.split(/[\s、,，/]+/).filter(Boolean);
+  if (parts.length >= 2 && LEVEL2.test(parts[parts.length - 1])) {
+    const district = parts[parts.length - 1];
+    const prev = parts[parts.length - 2];
+    return { city: TW_SHORT.get(prev) ?? prev, district };
+  }
+  if (parts.length === 1) {
+    const one = parts[0];
+    // 2) 連在一起：「新北市汐止區」「東京都荒川區」「大阪市北區」
+    const joined = one.match(/^(.{1,4}[都道府縣市])(.{1,5}[區市町村])$/);
+    if (joined) return { city: joined[1], district: joined[2] };
+    // 3) 簡稱開頭：「台北大安區」
+    for (const [short, full] of Array.from(TW_SHORT)) {
+      if (one.startsWith(short) && one.length > short.length) {
+        const rest = one.slice(short.length).replace(/^市|^縣/, '');
+        if (rest && LEVEL2.test(rest)) return { city: full, district: rest };
+      }
+    }
+    return { city: TW_SHORT.get(one) ?? one, district: null };
+  }
+  return { city: TW_SHORT.get(parts[0]) ?? parts[0], district: null };
+}
+
 /** 產生 Google 地圖連結；有 place_id 就鎖定那家店（會開店家頁而不是只掉一根座標針） */
 export function buildGoogleUrl(p: {
   name?: string | null;

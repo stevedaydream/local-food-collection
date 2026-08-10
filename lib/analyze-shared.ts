@@ -1,5 +1,6 @@
 // 前後端共用的分析 prompt / schema / 解析工具（不可 import 任何伺服器端 SDK）
 import type { AnalyzeResult } from './types';
+import { splitCityDistrict } from './place-url';
 
 export const SYSTEM_PROMPT = `你是美食截圖分析助手。使用者會傳來社群媒體（Instagram、Threads、小紅書、Facebook 等）的餐廳/美食貼文截圖。
 
@@ -10,6 +11,7 @@ export const SYSTEM_PROMPT = `你是美食截圖分析助手。使用者會傳�
 - 地址只在截圖中明確出現時才填寫；看不到地址就填 null，不要編造。
 - 一張截圖可能包含多家餐廳（例如清單型貼文），全部列出。
 - 若截圖與美食無關，is_food_content 設為 false、restaurants 為空陣列。
+- 地區分兩層填：city 只填一級行政區（台北市、東京都），district 填二級（信義區、荒川區）；不要把兩層寫在同一欄。
 - 所有文字欄位使用繁體中文（店名保留原文）。`;
 
 /** 給不支援 structured output 的模型（Gemini JSON mode、本機模型）用的 JSON 格式說明 */
@@ -20,7 +22,8 @@ export const JSON_INSTRUCTION = `請只輸出一個 JSON 物件（不要 markdow
     {
       "name": "店名",
       "address": "完整地址，截圖沒有就用 null",
-      "city": "城市或地區，如「台北 大安區」，不確定用 null",
+      "city": "一級行政區，如「台北市」「東京都」，不確定用 null",
+      "district": "二級行政區，如「信義區」「荒川區」，不確定用 null",
       "cuisine": "料理類型（日式/火鍋/咖啡廳…），不確定用 null",
       "dishes": ["推薦菜色"],
       "price_range": "價位（若有），否則 null",
@@ -76,7 +79,8 @@ export const SCHEMA = {
         properties: {
           name: { type: 'string', description: '餐廳或店家名稱' },
           address: { type: ['string', 'null'], description: '完整地址（若截圖中有）；沒有則為 null' },
-          city: { type: ['string', 'null'], description: '城市或地區，例如「台北 大安區」' },
+          city: { type: ['string', 'null'], description: '一級行政區，例如「台北市」「東京都」' },
+          district: { type: ['string', 'null'], description: '二級行政區，例如「信義區」「荒川區」' },
           cuisine: { type: ['string', 'null'], description: '料理類型，例如：日式、火鍋、咖啡廳、甜點' },
           dishes: { type: 'array', items: { type: 'string' }, description: '截圖中提到或出現的推薦菜色' },
           price_range: { type: ['string', 'null'], description: '價位資訊（若有），例如 $200-400/人' },
@@ -94,7 +98,7 @@ export const SCHEMA = {
             description: '對店名與地址判讀的信心程度',
           },
         },
-        required: ['name', 'address', 'city', 'cuisine', 'dishes', 'price_range', 'source_platform', 'notes', 'confidence'],
+        required: ['name', 'address', 'city', 'district', 'cuisine', 'dishes', 'price_range', 'source_platform', 'notes', 'confidence'],
         additionalProperties: false,
       },
     },
@@ -151,6 +155,17 @@ export function lenientParse(text: string): AnalyzeResult {
   return normalize(JSON.parse(t.slice(start, end + 1)));
 }
 
+/**
+ * 模型還是可能把兩層寫在 city（舊 prompt 的習慣），這裡統一拆開；
+ * 已經分開給的就直接用。
+ */
+function splitRegion(city: unknown, district: unknown) {
+  const rawCity = city ? String(city) : null;
+  const rawDistrict = district ? String(district) : null;
+  if (rawDistrict) return { city: rawCity, district: rawDistrict };
+  return splitCityDistrict(rawCity);
+}
+
 /** 補齊缺漏欄位，避免模型少給欄位時前端壞掉 */
 export function normalize(raw: unknown): AnalyzeResult {
   const obj = (raw ?? {}) as Record<string, unknown>;
@@ -162,7 +177,7 @@ export function normalize(raw: unknown): AnalyzeResult {
       .map((r) => ({
         name: String(r.name ?? '').trim(),
         address: r.address ? String(r.address) : null,
-        city: r.city ? String(r.city) : null,
+        ...splitRegion(r.city, r.district),
         cuisine: r.cuisine ? String(r.cuisine) : null,
         dishes: Array.isArray(r.dishes) ? r.dishes.map(String) : [],
         price_range: r.price_range ? String(r.price_range) : null,

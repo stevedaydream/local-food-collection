@@ -165,9 +165,11 @@ public class RandomFoodWidgetProvider extends AppWidgetProvider {
                     ? context.getString(R.string.widget_food_region_follow_empty)
                     : context.getString(R.string.widget_food_region_follow, followed);
         }
-        return region.isEmpty()
-                ? context.getString(R.string.widget_food_region_all)
-                : context.getString(R.string.widget_food_region, region);
+        if (region.isEmpty()) return context.getString(R.string.widget_food_region_all);
+        // 鎖到行政區時只顯示行政區（「📍 汐止區」比「📍 新北市|汐止區」好讀）
+        String district = WidgetData.districtOfRegion(region);
+        String shown = district.isEmpty() ? WidgetData.cityOfRegion(region) : district;
+        return context.getString(R.string.widget_food_region, shown);
     }
 
     /** 「料理類型 · 城市 · 推薦菜」一行摘要；已用區域篩過就不重複顯示城市 */
