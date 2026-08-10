@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SavedRestaurant } from '@/lib/types';
 import { countryOf } from '@/lib/country-bbox';
+import ThumbEditor from './ThumbEditor';
 
 export default function EditSheet({
   initial,
@@ -35,6 +36,10 @@ export default function EditSheet({
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [googleUrl, setGoogleUrl] = useState(initial?.googleUrl ?? '');
   const [shared, setShared] = useState(initial?.visibility === 'friends');
+  const [thumb, setThumb] = useState<string | null>(initial?.thumb ?? null);
+  /** 要送進釉窗裁切的圖；null = 沒有在裁切 */
+  const [cropping, setCropping] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [paste, setPaste] = useState(initialPaste);
   const [looking, setLooking] = useState(false);
@@ -155,7 +160,7 @@ export default function EditSheet({
       notes: notes.trim() || null,
       lat,
       lng,
-      thumb: initial?.thumb ?? null,
+      thumb,
       googleUrl: googleUrl.trim() || null,
       createdAt: initial?.createdAt ?? new Date().toISOString(),
       visibility: shared ? 'friends' : 'private',
@@ -167,6 +172,42 @@ export default function EditSheet({
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h2>{initial ? '✏️ 編輯收藏' : '✏️ 新增餐廳'}</h2>
+
+        {/* 縮圖：換照片、重新裁切、移除 */}
+        <div className="thumb-row">
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="thumb-preview" src={thumb} alt="縮圖預覽" />
+          ) : (
+            <div className="thumb-preview">🍽️</div>
+          )}
+          <div className="thumb-actions">
+            <button className="mini-btn" onClick={() => photoInput.current?.click()}>
+              📷 {thumb ? '換照片' : '加照片'}
+            </button>
+            {thumb && (
+              <>
+                <button className="mini-btn" onClick={() => setCropping(thumb)}>
+                  ✂️ 調整
+                </button>
+                <button className="mini-btn" onClick={() => setThumb(null)}>
+                  移除
+                </button>
+              </>
+            )}
+          </div>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (f) setCropping(URL.createObjectURL(f));
+            }}
+          />
+        </div>
 
         <div className="paste-box">
           <label>✨ 貼上地址或 Google 地圖連結，自動填好</label>
@@ -283,6 +324,23 @@ export default function EditSheet({
           </button>
         </div>
       </div>
+
+      {cropping && (
+        <ThumbEditor
+          src={cropping}
+          onDone={(next) => {
+            setThumb(next);
+            closeCropper();
+          }}
+          onClose={closeCropper}
+        />
+      )}
     </div>
   );
+
+  function closeCropper() {
+    // 從相簿選的圖是 blob URL，用完要放掉
+    if (cropping?.startsWith('blob:')) URL.revokeObjectURL(cropping);
+    setCropping(null);
+  }
 }

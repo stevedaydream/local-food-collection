@@ -3,12 +3,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AnalyzeResult } from './types';
 import {
   buildOpenAICompatibleBody,
-  JSON_INSTRUCTION,
+  buildPrompt,
   lenientParse,
   normalize,
-  SCHEMA,
-  SYSTEM_PROMPT,
-  USER_TEXT,
+  type AnalyzePrompt,
+  type NearbyCandidate,
 } from './analyze-shared';
 
 export type ProviderId = 'anthropic' | 'gpt' | 'gemini' | 'custom';
@@ -53,7 +52,7 @@ interface ImageInput {
 
 // ---------- Anthropic ----------
 
-async function analyzeAnthropic(img: ImageInput): Promise<AnalyzeResult> {
+async function analyzeAnthropic(img: ImageInput, prompt: AnalyzePrompt): Promise<AnalyzeResult> {
   const client = new Anthropic();
   const model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
   try {
@@ -61,9 +60,9 @@ async function analyzeAnthropic(img: ImageInput): Promise<AnalyzeResult> {
       model,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      system: SYSTEM_PROMPT,
+      system: prompt.system,
       output_config: {
-        format: { type: 'json_schema', schema: SCHEMA as unknown as Record<string, unknown> },
+        format: { type: 'json_schema', schema: prompt.schema as Record<string, unknown> },
       },
       messages: [
         {
@@ -77,7 +76,7 @@ async function analyzeAnthropic(img: ImageInput): Promise<AnalyzeResult> {
                 data: img.base64,
               },
             },
-            { type: 'text', text: USER_TEXT },
+            { type: 'text', text: prompt.userText },
           ],
         },
       ],
@@ -101,7 +100,14 @@ async function analyzeAnthropic(img: ImageInput): Promise<AnalyzeResult> {
 
 async function analyzeOpenAICompatible(
   img: ImageInput,
-  opts: { baseUrl: string; apiKey: string | undefined; model: string; strictSchema: boolean; label: string },
+  opts: {
+    baseUrl: string;
+    apiKey: string | undefined;
+    model: string;
+    strictSchema: boolean;
+    label: string;
+    prompt: AnalyzePrompt;
+  },
 ): Promise<AnalyzeResult> {
   const res = await fetch(`${opts.baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
@@ -127,18 +133,21 @@ async function analyzeOpenAICompatible(
 
 // ---------- Gemini ----------
 
-async function analyzeGemini(img: ImageInput): Promise<AnalyzeResult> {
+async function analyzeGemini(img: ImageInput, prompt: AnalyzePrompt): Promise<AnalyzeResult> {
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${SYSTEM_PROMPT}\n\n${JSON_INSTRUCTION}` }] },
+      systemInstruction: { parts: [{ text: `${prompt.system}\n\n${prompt.jsonInstruction}` }] },
       contents: [
         {
           role: 'user',
-          parts: [{ inline_data: { mime_type: img.mediaType, data: img.base64 } }, { text: USER_TEXT }],
+          parts: [
+            { inline_data: { mime_type: img.mediaType, data: img.base64 } },
+            { text: prompt.userText },
+          ],
         },
       ],
       generationConfig: { responseMimeType: 'application/json' },
@@ -162,11 +171,21 @@ async function analyzeGemini(img: ImageInput): Promise<AnalyzeResult> {
 
 // ---------- 入口 ----------
 
-export async function analyzeImage(provider: ProviderId, img: ImageInput): Promise<AnalyzeResult> {
+/**
+ * @param mode screenshot=社群截圖；photo=現場拍的照片（會附上附近店家清單讓模型指認）
+ * @param candidates 拍照模式的附近店家清單（依 GPS 查到）
+ */
+export async function analyzeImage(
+  provider: ProviderId,
+  img: ImageInput,
+  mode: 'screenshot' | 'photo' = 'screenshot',
+  candidates: NearbyCandidate[] = [],
+): Promise<AnalyzeResult> {
+  const prompt = buildPrompt(mode, candidates);
   switch (provider) {
     case 'anthropic':
       if (!process.env.ANTHROPIC_API_KEY) throw new ProviderError('伺服器未設定 ANTHROPIC_API_KEY。', 500);
-      return analyzeAnthropic(img);
+      return analyzeAnthropic(img, prompt);
     case 'gpt':
       if (!process.env.OPENAI_API_KEY) throw new ProviderError('伺服器未設定 OPENAI_API_KEY。', 500);
       return analyzeOpenAICompatible(img, {
@@ -175,10 +194,11 @@ export async function analyzeImage(provider: ProviderId, img: ImageInput): Promi
         model: process.env.OPENAI_MODEL || 'gpt-4o',
         strictSchema: true,
         label: 'OpenAI',
+        prompt,
       });
     case 'gemini':
       if (!process.env.GEMINI_API_KEY) throw new ProviderError('伺服器未設定 GEMINI_API_KEY。', 500);
-      return analyzeGemini(img);
+      return analyzeGemini(img, prompt);
     case 'custom':
       if (!process.env.CUSTOM_BASE_URL) throw new ProviderError('伺服器未設定 CUSTOM_BASE_URL。', 500);
       // 本機/自架模型（如 Gemma）常不支援 response_format，改用 prompt 要求 JSON + 容錯解析
@@ -188,6 +208,7 @@ export async function analyzeImage(provider: ProviderId, img: ImageInput): Promi
         model: process.env.CUSTOM_MODEL || 'gemma-3-27b-it',
         strictSchema: false,
         label: '自訂模型',
+        prompt,
       });
   }
 }

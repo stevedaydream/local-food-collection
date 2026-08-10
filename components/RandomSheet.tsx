@@ -399,7 +399,7 @@ export default function RandomSheet({
                 {others.map((o) => (
                   <div className="other-row" key={`${o.source}-${o.name}`}>
                     <span className="other-name">{o.name}</span>
-                    <span className="other-meta">
+                    <span className={`other-meta${o.km != null ? ' num' : ''}`}>
                       {o.km != null ? formatDistance(o.km) : (o.rating ? `⭐ ${o.rating}` : (o.cuisine ?? ''))}
                     </span>
                     <a href={mapsUrl(o)} target="_blank" rel="noreferrer">

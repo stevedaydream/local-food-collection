@@ -1,7 +1,7 @@
 // 本機模式：瀏覽器直接連使用者裝置上的 OpenAI 相容模型伺服器（Ollama / llama.cpp / LM Studio…）
 // 截圖完全不離開使用者的裝置/區網。
 import type { AnalyzeResult } from './types';
-import { buildOpenAICompatibleBody, lenientParse } from './analyze-shared';
+import { buildOpenAICompatibleBody, lenientParse, type AnalyzePrompt } from './analyze-shared';
 
 export interface LocalConfig {
   baseUrl: string;
@@ -86,10 +86,14 @@ export async function testLocalConnection(
   }
 }
 
-/** 在瀏覽器端直接呼叫本機模型分析截圖 */
+/**
+ * 在瀏覽器端直接呼叫本機模型分析圖片。
+ * @param prompt 省略＝截圖模式；拍照模式請傳 buildPrompt('photo', 附近店家清單)
+ */
 export async function analyzeLocal(
   cfg: LocalConfig,
   img: { base64: string; mediaType: string },
+  prompt?: AnalyzePrompt,
 ): Promise<AnalyzeResult> {
   if (mixedContentBlocked(cfg.baseUrl)) {
     throw new Error('瀏覽器擋住了連往 http:// 區網位址的請求，請到 ⚙️ 設定查看本機模式教學。');
@@ -100,7 +104,9 @@ export async function analyzeLocal(
       method: 'POST',
       headers: headers(cfg),
       // 本機模型普遍不支援 response_format，改用 prompt 要求 JSON
-      body: JSON.stringify(buildOpenAICompatibleBody(img, { model: cfg.model, strictSchema: false })),
+      body: JSON.stringify(
+        buildOpenAICompatibleBody(img, { model: cfg.model, strictSchema: false, prompt }),
+      ),
     });
   } catch {
     throw new Error('連不上本機模型伺服器，請確認伺服器已啟動、CORS 已開啟（⚙️ 設定 → 本機模式教學）。');

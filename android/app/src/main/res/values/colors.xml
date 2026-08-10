@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  青磁 × 竹：與網頁端 app/globals.css 的 token 同一組釉色。
+  widget 疊在使用者的桌布上，所以固定用淺色那一組（不跟隨系統深色）。
+-->
+<resources>
+    <color name="celadon">#14655F</color>
+    <color name="celadon_mid">#1F8A83</color>
+    <color name="celadon_soft">#FFDCEFEB</color>
+    <color name="porcelain">#FFF7FBFA</color>
+    <color name="ink">#123330</color>
+    <color name="ink_dim">#5A7C77</color>
+    <color name="ink_faint">#8AA8A3</color>
+    <color name="hairline">#22123330</color>
+</resources>

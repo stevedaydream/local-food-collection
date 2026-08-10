@@ -1,4 +1,4 @@
-// 產生 PWA icon（純 Node，不需外部影像套件）：橘底 + 白色碗形
+// 產生 PWA icon（純 Node，不需外部影像套件）：青磁底 + 白磁碗形
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -57,8 +57,8 @@ function encodePng(size, pixelFn) {
   ]);
 }
 
-const BG = [255, 107, 26]; // 品牌橘
-const BOWL = [255, 244, 235];
+const BG = [31, 138, 131]; // 青磁 #1F8A83
+const BOWL = [242, 247, 245]; // 白磁 #F2F7F5
 
 function pixel(x, y, size) {
   const cx = size / 2;

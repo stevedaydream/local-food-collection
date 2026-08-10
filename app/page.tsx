@@ -14,15 +14,22 @@ import EditSheet from '@/components/EditSheet';
 import SettingsSheet from '@/components/SettingsSheet';
 import FriendsSheet from '@/components/FriendsSheet';
 import LocationPanel from '@/components/LocationPanel';
+import ThemeToggle from '@/components/ThemeToggle';
 import { canAutoLocate, locationLabel, resolveLocation, type DeviceLocation } from '@/lib/location';
 import { countryOf, distanceKm } from '@/lib/country-bbox';
+import { readExifGps } from '@/lib/exif';
 import { stashPendingInvite, tryAcceptPendingInvite } from '@/lib/friends';
 // 地圖暫時下架；MapView 保留為未來 Google Maps API 的接口（components/MapView.tsx）
 
 export default function Home() {
   const [restaurants, setRestaurants] = useState<SavedRestaurant[]>([]);
   const [ready, setReady] = useState(false);
-  const [analyzeFile, setAnalyzeFile] = useState<Blob | null>(null);
+  /** 要分析的圖片：kind='photo' 走 GPS + 附近店家對照，'screenshot' 走原本的截圖流程 */
+  const [analyzeFile, setAnalyzeFile] = useState<{ blob: Blob; kind: 'screenshot' | 'photo' } | null>(
+    null,
+  );
+  /** 📸 按鈕的小選單：拍店家 / 從相簿選 */
+  const [showPickMenu, setShowPickMenu] = useState(false);
   const [showRandom, setShowRandom] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
@@ -40,7 +47,10 @@ export default function Home() {
   });
   // 條件篩選（空字串 = 不篩）
   const [fSource, setFSource] = useState('');
+  /** 一級行政區：台北市 / 東京都 */
   const [fCity, setFCity] = useState('');
+  /** 二級行政區：信義區 / 荒川區（非必填；不選＝該一級底下全部） */
+  const [fDistrict, setFDistrict] = useState('');
   const [fCuisine, setFCuisine] = useState('');
   const [fFavorite, setFFavorite] = useState(false);
   /** 只看目前所在國家、並按距離排序 */
@@ -49,11 +59,32 @@ export default function Home() {
   const uniq = (xs: (string | null)[]) =>
     Array.from(new Set(xs.filter((x): x is string => !!x))).sort();
   const sources = useMemo(() => uniq(restaurants.map((r) => r.sourcePlatform)), [restaurants]);
-  const cities = useMemo(() => uniq(restaurants.map((r) => r.city)), [restaurants]);
   const cuisines = useMemo(() => uniq(restaurants.map((r) => r.cuisine)), [restaurants]);
 
   /** 這家店在哪一國：優先用存下來的 countryCode，舊資料用座標推 */
   const codeOf = (r: SavedRestaurant) => r.countryCode ?? countryOf(r.lat, r.lng)?.code ?? null;
+
+  /**
+   * 地區篩選分兩層，且依「目前所在國家」分組：
+   * 你在日本時，日本的縣市排在最前面（其他國家收在下面的分組，出國前規劃行程還是找得到）。
+   */
+  const cityGroups = useMemo(() => {
+    const here = location?.countryCode ?? null;
+    const mine: string[] = [];
+    const others: string[] = [];
+    for (const city of uniq(restaurants.map((r) => r.city))) {
+      const inCurrentCountry = restaurants.some((r) => r.city === city && codeOf(r) === here);
+      (here && inCurrentCountry ? mine : others).push(city);
+    }
+    return { mine, others, currentCountry: location?.country ?? null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurants, location?.countryCode, location?.country]);
+
+  /** 選了一級行政區才有二級可選；選項只列該一級底下實際有的行政區 */
+  const districts = useMemo(
+    () => (fCity ? uniq(restaurants.filter((r) => r.city === fCity).map((r) => r.district ?? null)) : []),
+    [restaurants, fCity],
+  );
   /** 離目前位置多遠（沒位置或沒座標時為 null），開「📍 這附近」時卡片會顯示 */
   const kmOf = (r: SavedRestaurant) =>
     location && r.lat != null && r.lng != null
@@ -67,12 +98,15 @@ export default function Home() {
         (!fFavorite || r.favorite) &&
         (!fSource || r.sourcePlatform === fSource) &&
         (!fCity || r.city === fCity) &&
+        // 二級沒選＝該一級底下全部都算
+        (!fDistrict || r.district === fDistrict) &&
         (!fCuisine || r.cuisine === fCuisine) &&
         (!nearOn || codeOf(r) === location!.countryCode),
     )
     .sort((a, b) => (nearOn ? (kmOf(a) ?? Infinity) - (kmOf(b) ?? Infinity) : 0));
-  const filterOn = !!(fSource || fCity || fCuisine || fFavorite || fNear);
+  const filterOn = !!(fSource || fCity || fDistrict || fCuisine || fFavorite || fNear);
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -119,8 +153,9 @@ export default function Home() {
 
     // Capacitor 殼內分享截圖進來（原生 ACTION_SEND）：跟原生 plugin 取圖
     if (params.get('share-native') === '1') {
-      takePendingSharedImage().then((b) => {
-        if (b) setAnalyzeFile(b);
+      takePendingSharedImage().then(async (b) => {
+        // 分享進來的圖：有 GPS 的是實景照 → 走拍照辨識；沒有的是截圖
+        if (b) setAnalyzeFile({ blob: b, kind: (await readExifGps(b)) ? 'photo' : 'screenshot' });
       });
     }
 
@@ -154,7 +189,8 @@ export default function Home() {
           const cache = await caches.open('shared-images');
           const res = await cache.match('/shared-image');
           if (res) {
-            setAnalyzeFile(await res.blob());
+            const blob = await res.blob();
+            setAnalyzeFile({ blob, kind: (await readExifGps(blob)) ? 'photo' : 'screenshot' });
             await cache.delete('/shared-image');
           }
         } catch {
@@ -230,7 +266,10 @@ export default function Home() {
             🍜 口袋<span>美食地圖</span>
           </h1>
           <span className="meta" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {restaurants.length} 家收藏
+            <span>
+              <span className="num">{restaurants.length}</span> 家收藏
+            </span>
+            <ThemeToggle />
             <button className="icon-btn" onClick={() => setShowFriends(true)} aria-label="朋友">
               👥
             </button>
@@ -294,14 +333,57 @@ export default function Home() {
                 </option>
               ))}
             </select>
-            <select value={fCity} onChange={(e) => setFCity(e.target.value)} aria-label="地區篩選">
+            <select
+              value={fCity}
+              onChange={(e) => {
+                setFCity(e.target.value);
+                setFDistrict(''); // 換縣市時二級要跟著重設，否則會篩出空清單
+              }}
+              aria-label="縣市篩選"
+            >
               <option value="">地區</option>
-              {cities.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {cityGroups.mine.length > 0 ? (
+                <>
+                  <optgroup label={cityGroups.currentCountry ?? '目前所在國家'}>
+                    {cityGroups.mine.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {/* 開了「📍 這附近」時只看目前國家，別的國家列出來只會篩成空清單 */}
+                  {cityGroups.others.length > 0 && !nearOn && (
+                    <optgroup label="其他國家">
+                      {cityGroups.others.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
+              ) : (
+                cityGroups.others.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))
+              )}
             </select>
+            {districts.length > 0 && (
+              <select
+                value={fDistrict}
+                onChange={(e) => setFDistrict(e.target.value)}
+                aria-label="行政區篩選"
+              >
+                <option value="">{fCity} 全部</option>
+                {districts.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            )}
             <select value={fCuisine} onChange={(e) => setFCuisine(e.target.value)} aria-label="類型篩選">
               <option value="">類型</option>
               {cuisines.map((c) => (
@@ -316,6 +398,7 @@ export default function Home() {
                 onClick={() => {
                   setFSource('');
                   setFCity('');
+                  setFDistrict('');
                   setFCuisine('');
                   setFFavorite(false);
                   setFNear(false);
@@ -364,9 +447,35 @@ export default function Home() {
         )}
       </section>
 
+      {showPickMenu && (
+        <>
+          <div className="pick-menu-backdrop" onClick={() => setShowPickMenu(false)} />
+          <div className="pick-menu">
+            <button
+              onClick={() => {
+                setShowPickMenu(false);
+                cameraInput.current?.click();
+              }}
+            >
+              📷 拍店家招牌
+              <span>用 GPS 對照附近店家，自動抓正式店名與地址</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowPickMenu(false);
+                fileInput.current?.click();
+              }}
+            >
+              🖼 從相簿選（截圖／照片）
+              <span>社群截圖交給 AI 歸檔；照片有 GPS 就一起對照店家</span>
+            </button>
+          </div>
+        </>
+      )}
+
       <div className="bottom-bar">
-        <button className="btn secondary" onClick={() => fileInput.current?.click()}>
-          📸 截圖
+        <button className="btn secondary" onClick={() => setShowPickMenu((v) => !v)}>
+          📸 拍照/截圖
         </button>
         <button className="btn secondary" onClick={handleOpenPaste}>
           🔗 貼連結
@@ -385,15 +494,31 @@ export default function Home() {
         </button>
       </div>
 
+      {/* 直接開後鏡頭拍店家 → 一定走拍照辨識流程 */}
+      <input
+        ref={cameraInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setAnalyzeFile({ blob: f, kind: 'photo' });
+          e.target.value = '';
+        }}
+      />
+      {/* 相簿：有 EXIF GPS 的當實景照辨識，沒有的當截圖（截圖不會有 GPS） */}
       <input
         ref={fileInput}
         type="file"
         accept="image/*"
         hidden
-        onChange={(e) => {
+        onChange={async (e) => {
           const f = e.target.files?.[0];
-          if (f) setAnalyzeFile(f);
           e.target.value = '';
+          if (!f) return;
+          const gps = await readExifGps(f);
+          setAnalyzeFile({ blob: f, kind: gps ? 'photo' : 'screenshot' });
         }}
       />
       <input
@@ -409,7 +534,13 @@ export default function Home() {
       />
 
       {analyzeFile && (
-        <AnalyzeSheet file={analyzeFile} onSave={handleSaved} onClose={() => setAnalyzeFile(null)} />
+        <AnalyzeSheet
+          file={analyzeFile.blob}
+          kind={analyzeFile.kind}
+          location={location}
+          onSave={handleSaved}
+          onClose={() => setAnalyzeFile(null)}
+        />
       )}
       {showRandom && (
         <RandomSheet

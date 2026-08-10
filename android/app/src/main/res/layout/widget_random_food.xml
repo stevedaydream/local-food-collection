@@ -42,7 +42,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/widget_food_title"
                 android:textSize="11sp"
-                android:textColor="#B45309"
+                android:textColor="@color/celadon"
                 android:textStyle="bold" />
 
             <!-- 點區域標籤 → 開設定畫面換區域 -->
@@ -60,7 +60,7 @@
                 android:ellipsize="end"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
-                android:textColor="#B45309" />
+                android:textColor="@color/celadon" />
         </LinearLayout>
 
         <!-- 沒有資料時的空狀態（文字由 provider 依「完全沒收藏／這區沒收藏」帶入） -->
@@ -72,7 +72,7 @@
             android:gravity="center"
             android:text="@string/widget_food_empty"
             android:textSize="13sp"
-            android:textColor="#888888"
+            android:textColor="@color/ink_faint"
             android:visibility="gone" />
 
         <LinearLayout
@@ -88,7 +88,7 @@
                 android:layout_marginTop="3dp"
                 android:textSize="17sp"
                 android:textStyle="bold"
-                android:textColor="#1F2937"
+                android:textColor="@color/ink"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -98,7 +98,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textSize="12sp"
-                android:textColor="#6B7280"
+                android:textColor="@color/ink_dim"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -108,7 +108,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
                 android:textSize="11sp"
-                android:textColor="#9CA3AF"
+                android:textColor="@color/ink_faint"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -130,7 +130,7 @@
                     android:text="@string/widget_food_shuffle"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:textColor="#B45309" />
+                    android:textColor="@color/celadon" />
 
                 <TextView
                     android:id="@+id/widget_food_maps"
@@ -145,7 +145,7 @@
                     android:text="@string/widget_food_maps"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:textColor="#B45309" />
+                    android:textColor="@color/celadon" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

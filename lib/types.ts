@@ -40,6 +40,10 @@ export interface ExtractedRestaurant {
   source_platform: string | null;
   notes: string | null;
   confidence: 'high' | 'medium' | 'low';
+  /** 拍照模式：對應到「附近店家清單」第幾家（對不上為 null） */
+  nearby_index?: number | null;
+  /** 拍照模式：其他也可能的候選編號，依可能性排序 */
+  alternate_indexes?: number[];
 }
 
 export interface AnalyzeResult {

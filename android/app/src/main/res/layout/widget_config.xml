@@ -23,8 +23,10 @@
         android:textColor="?android:attr/textColorSecondary" />
 
     <ScrollView
+        android:id="@+id/widget_config_scroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:layout_marginTop="12dp">
 
         <RadioGroup
@@ -42,19 +44,13 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/widget_config_cancel"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/widget_config_cancel" />
-
-        <Button
             android:id="@+id/widget_config_ok"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="@string/widget_config_ok"
-            android:textStyle="bold" />
+            android:minWidth="120dp"
+            android:background="@drawable/widget_btn_bg"
+            android:textColor="@color/celadon"
+            android:textStyle="bold"
+            android:text="@string/widget_config_ok" />
     </LinearLayout>
 </LinearLayout>

@@ -33,6 +33,38 @@ export const JSON_INSTRUCTION = `請只輸出一個 JSON 物件（不要 markdow
 
 export const USER_TEXT = '請分析這張截圖，抽出所有餐廳資訊。';
 
+/** 拍照模式（實景照：招牌、門面、菜單）的 system prompt */
+export const PHOTO_SYSTEM_PROMPT = `你是美食拍照記錄助手。使用者會傳來「現場拍的照片」——通常是店家招牌或門面，也可能是菜單、價目表。
+
+你的任務：辨識這是哪一家店，抽出結構化資訊。
+
+規則：
+- 店名以招牌/門面上實際出現的文字為準（保留原文，例如日文店名就填日文），不要翻譯、不要猜測。
+- 使用者會附上「附近店家清單」（依 GPS 定位查到的）。請比對照片上的店名與清單，選出最可能的一家，把它的編號填進 nearby_index；招牌是簡稱或清單裡是正式名稱時也要盡量對上。
+- 完全對不上就把 nearby_index 設為 null，仍然照招牌文字填 name。
+- 另外把其他也有可能的候選編號（最多 3 個，依可能性排序）填進 alternate_indexes。
+- 照片裡看得到菜單、價目、營業時間就一併抽進 dishes / price_range / notes。
+- 地址只在照片中明確出現時才填；看不到就填 null（程式會用清單裡的地址補）。
+- 如果這其實是社群媒體貼文的截圖（不是實景照），就照截圖規則抽出所有餐廳，nearby_index 填 null。
+- 一張照片通常只有一家店；真的有多家（例如整排招牌）才列多筆。
+- 所有描述性文字使用繁體中文（店名保留原文）。`;
+
+export interface NearbyCandidate {
+  name: string;
+  address: string | null;
+}
+
+/** 把附近店家清單編號後附在使用者訊息裡，讓模型可以用 nearby_index 指認 */
+export function buildPhotoUserText(candidates: NearbyCandidate[]): string {
+  if (!candidates.length) {
+    return '請辨識這張照片裡的店家。（這次沒有查到附近店家清單，nearby_index 請填 null）';
+  }
+  const list = candidates
+    .map((c, i) => `[${i}] ${c.name}${c.address ? `（${c.address}）` : ''}`)
+    .join('\n');
+  return `請辨識這張照片裡的店家，並比對下面依定位查到的附近店家清單：\n${list}\n\n選出最可能的一家填 nearby_index（對不上填 null），其他可能的填 alternate_indexes。`;
+}
+
 export const SCHEMA = {
   type: 'object',
   properties: {
@@ -71,6 +103,43 @@ export const SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** 拍照模式的 schema：多了「對應到附近清單第幾家」的欄位 */
+export const PHOTO_SCHEMA = {
+  ...SCHEMA,
+  properties: {
+    ...SCHEMA.properties,
+    restaurants: {
+      ...SCHEMA.properties.restaurants,
+      items: {
+        ...SCHEMA.properties.restaurants.items,
+        properties: {
+          ...SCHEMA.properties.restaurants.items.properties,
+          nearby_index: {
+            type: ['integer', 'null'],
+            description: '對應到附近店家清單的編號；對不上填 null',
+          },
+          alternate_indexes: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: '其他也可能的候選編號，依可能性排序，最多 3 個',
+          },
+        },
+        required: [
+          ...SCHEMA.properties.restaurants.items.required,
+          'nearby_index',
+          'alternate_indexes',
+        ],
+      },
+    },
+  },
+} as const;
+
+/** 拍照模式的 JSON 格式說明（給不支援 structured output 的模型） */
+export const PHOTO_JSON_INSTRUCTION = JSON_INSTRUCTION.replace(
+  '"confidence": "high | medium | low"',
+  '"confidence": "high | medium | low",\n      "nearby_index": 對應附近清單的編號或 null,\n      "alternate_indexes": [其他可能的編號]',
+);
+
 /** 容錯 JSON 解析：去除 code fence、擷取最外層物件 */
 export function lenientParse(text: string): AnalyzeResult {
   let t = text.trim();
@@ -103,25 +172,66 @@ export function normalize(raw: unknown): AnalyzeResult {
           | 'high'
           | 'medium'
           | 'low',
+        // 拍照模式才有：對應到附近店家清單第幾家
+        nearby_index: Number.isInteger(r.nearby_index) ? (r.nearby_index as number) : null,
+        alternate_indexes: Array.isArray(r.alternate_indexes)
+          ? r.alternate_indexes.filter((n): n is number => Number.isInteger(n)).slice(0, 3)
+          : [],
       }))
       .filter((r) => r.name),
+  };
+}
+
+/** 一次分析要用的 prompt 組合（截圖模式或拍照模式） */
+export interface AnalyzePrompt {
+  system: string;
+  userText: string;
+  jsonInstruction: string;
+  schema: unknown;
+}
+
+/**
+ * 依模式組出 prompt。
+ * 拍照模式會把附近店家清單編號後附進使用者訊息，讓模型指認是哪一家。
+ */
+export function buildPrompt(
+  mode: 'screenshot' | 'photo',
+  candidates: NearbyCandidate[] = [],
+): AnalyzePrompt {
+  if (mode === 'photo') {
+    return {
+      system: PHOTO_SYSTEM_PROMPT,
+      userText: buildPhotoUserText(candidates),
+      jsonInstruction: PHOTO_JSON_INSTRUCTION,
+      schema: PHOTO_SCHEMA,
+    };
+  }
+  return {
+    system: SYSTEM_PROMPT,
+    userText: USER_TEXT,
+    jsonInstruction: JSON_INSTRUCTION,
+    schema: SCHEMA,
   };
 }
 
 /** OpenAI 相容 chat/completions 請求 body（本機模式與伺服器端共用） */
 export function buildOpenAICompatibleBody(
   img: { base64: string; mediaType: string },
-  opts: { model: string; strictSchema: boolean },
+  opts: { model: string; strictSchema: boolean; prompt?: AnalyzePrompt },
 ): Record<string, unknown> {
+  const prompt = opts.prompt ?? buildPrompt('screenshot');
   const body: Record<string, unknown> = {
     model: opts.model,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT + (opts.strictSchema ? '' : `\n\n${JSON_INSTRUCTION}`) },
+      {
+        role: 'system',
+        content: prompt.system + (opts.strictSchema ? '' : `\n\n${prompt.jsonInstruction}`),
+      },
       {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.base64}` } },
-          { type: 'text', text: USER_TEXT },
+          { type: 'text', text: prompt.userText },
         ],
       },
     ],
@@ -129,7 +239,7 @@ export function buildOpenAICompatibleBody(
   if (opts.strictSchema) {
     body.response_format = {
       type: 'json_schema',
-      json_schema: { name: 'analyze_result', strict: true, schema: SCHEMA },
+      json_schema: { name: 'analyze_result', strict: true, schema: prompt.schema },
     };
   }
   return body;

@@ -31,6 +31,7 @@ import {
   restoreFromDrive,
 } from '@/lib/google-drive';
 import { getLocalConfig } from '@/lib/local-mode';
+import { loadThemeChoice, saveThemeChoice, type ThemeChoice } from '@/lib/theme';
 import LocalSetupSheet from './LocalSetupSheet';
 
 interface ProviderInfo {
@@ -186,6 +187,16 @@ export default function SettingsSheet({
     }
   };
 
+  // 外觀（淺色 / 深色 / 跟隨系統）
+  const [theme, setTheme] = useState<ThemeChoice>('auto');
+  useEffect(() => setTheme(loadThemeChoice()), []);
+  const chooseTheme = (next: ThemeChoice) => {
+    setTheme(next);
+    saveThemeChoice(next);
+    // 通知標題列那顆開關同步
+    window.dispatchEvent(new Event('food-map:theme'));
+  };
+
   // 補齊地區資料（縣市 / 行政區 / 國家）
   const [geoBusy, setGeoBusy] = useState('');
   const [geoMsg, setGeoMsg] = useState<{ text: string; error?: boolean } | null>(null);
@@ -278,10 +289,36 @@ export default function SettingsSheet({
     </label>
   );
 
+  const themeRow = (value: ThemeChoice, label: string, hint: string) => (
+    <label
+      key={value}
+      style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '9px 4px', fontSize: 15 }}
+    >
+      <input
+        type="radio"
+        name="theme"
+        style={{ width: 'auto' }}
+        checked={theme === value}
+        onChange={() => chooseTheme(value)}
+      />
+      <span style={{ flex: 1 }}>
+        {label}
+        <span className="meta" style={{ display: 'block', fontSize: 12 }}>
+          {hint}
+        </span>
+      </span>
+    </label>
+  );
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <h2>👤 帳號與雲端同步</h2>
+        <h2>🎨 外觀</h2>
+        {themeRow('auto', '跟隨系統', '手機切換深色模式時一起換')}
+        {themeRow('light', '淺色', '白磁底、青磁重點色')}
+        {themeRow('dark', '深色', '同一組釉色的夜間版')}
+
+        <h2 style={{ marginTop: 22 }}>👤 帳號與雲端同步</h2>
         {!isAuthConfigured() ? (
           <p className="meta" style={{ fontSize: 12.5 }}>
             伺服器尚未設定 Supabase（NEXT_PUBLIC_SUPABASE_URL / ANON_KEY），暫時無法登入同步。

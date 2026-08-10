@@ -178,7 +178,7 @@ export default function LocalSetupSheet({ onDone }: { onDone: (configured: boole
         {testResult && (
           <p
             className={testResult.ok ? 'meta' : 'error-text'}
-            style={{ marginTop: 8, fontSize: 13, color: testResult.ok ? '#7ed491' : undefined }}
+            style={{ marginTop: 8, fontSize: 13, color: testResult.ok ? 'var(--bamboo)' : undefined }}
           >
             {testResult.ok ? '✅ ' : ''}
             {testResult.message}

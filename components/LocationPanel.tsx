@@ -136,7 +136,7 @@ export default function LocationPanel({
 
         <div className="loc-current">
           <strong>{location ? locationLabel(location) : '還沒有位置資訊'}</strong>
-          <span className="meta">
+          <span className="meta num">
             {location
               ? [
                   location.source === 'manual' ? '手動指定' : 'GPS 定位',

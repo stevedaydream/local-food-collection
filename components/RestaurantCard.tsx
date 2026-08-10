@@ -120,7 +120,11 @@ export default function RestaurantCard({
             {r.notes ? <div>📝 {r.notes}</div> : null}
           </div>
           <div className="chips">
-            {km != null && <span className="chip accent">📍 {formatDistance(km)}</span>}
+            {km != null && (
+              <span className="chip accent">
+                📍 <span className="num">{formatDistance(km)}</span>
+              </span>
+            )}
             {r.visibility === 'friends' && <span className="chip">👥 已分享</span>}
             {r.cuisine && <span className="chip accent">{r.cuisine}</span>}
             {r.priceRange && <span className="chip">{r.priceRange}</span>}
@@ -135,7 +139,7 @@ export default function RestaurantCard({
         <div className="card-actions">
           <button
             className="icon-btn"
-            style={{ fontSize: 17, lineHeight: 1 }}
+            style={{ fontSize: 17, lineHeight: 1, color: r.favorite ? 'var(--bamboo)' : undefined }}
             aria-label={r.favorite ? '移出我的最愛' : '加入我的最愛'}
             onClick={() => onToggleFavorite(r)}
           >

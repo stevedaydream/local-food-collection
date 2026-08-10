@@ -13,7 +13,14 @@ const VALID: ProviderId[] = ['anthropic', 'gpt', 'gemini', 'custom'];
 const ALLOWED_MEDIA = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 export async function POST(req: Request) {
-  let body: { image?: string; mediaType?: string; provider?: string };
+  let body: {
+    image?: string;
+    mediaType?: string;
+    provider?: string;
+    /** photo = 現場拍的照片，會附上附近店家清單讓模型指認 */
+    mode?: 'screenshot' | 'photo';
+    candidates?: Array<{ name?: string; address?: string | null }>;
+  };
   try {
     body = await req.json();
   } catch {
@@ -47,8 +54,15 @@ export async function POST(req: Request) {
     provider = body.provider as ProviderId;
   }
 
+  const mode = body.mode === 'photo' ? 'photo' : 'screenshot';
+  // 清單只取模型需要的欄位，且限制筆數避免 prompt 過長
+  const candidates = (body.candidates ?? [])
+    .filter((c) => c.name)
+    .slice(0, 20)
+    .map((c) => ({ name: String(c.name), address: c.address ? String(c.address) : null }));
+
   try {
-    const result = await analyzeImage(provider, { base64: image, mediaType });
+    const result = await analyzeImage(provider, { base64: image, mediaType }, mode, candidates);
     return NextResponse.json({ ...result, provider });
   } catch (err) {
     if (err instanceof ProviderError) {

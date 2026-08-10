@@ -21,9 +21,11 @@
     </style>
 
     <!-- Widget 區域設定畫面：浮在桌面上的小對話框 -->
-    <style name="WidgetConfigTheme" parent="Theme.AppCompat.DayNight.Dialog">
+    <style name="WidgetConfigTheme" parent="Theme.AppCompat.Light.Dialog">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/porcelain</item>
+        <item name="colorAccent">@color/celadon_mid</item>
     </style>
 
     <!-- Widget 骰子滾動的單一骰面 -->
@@ -32,6 +34,6 @@
         <item name="android:layout_height">match_parent</item>
         <item name="android:gravity">center</item>
         <item name="android:textSize">44sp</item>
-        <item name="android:textColor">#B45309</item>
+        <item name="android:textColor">@color/celadon_mid</item>
     </style>
 </resources>
